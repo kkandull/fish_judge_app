@@ -3,8 +3,18 @@ import 'screens/ai_scan_screen.dart';
 import 'screens/weather_screen.dart';
 import 'screens/encyclopedia_screen.dart';
 import 'screens/shop_screen.dart';
+import 'services/ai_services.dart';
 
-void main() {
+// 전역 변수로 선언하여 어디서든 접근 가능하게 만듭니다.
+final aiService = AiService();
+
+void main() async {
+  // 비동기 작업을 위해 바인딩 확인
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // 앱 시작 전 모델 미리 로드
+  await aiService.loadModel();
+  
   runApp(const SmartFishingApp());
 }
 
@@ -14,13 +24,15 @@ class SmartFishingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Smart Fishing App',
+      title: 'Busan Fish App', // 이름 수정 완료!
       theme: ThemeData(primarySwatch: Colors.blue),
-      home: const MainSkeleton(), 
-      debugShowCheckedModeBanner: false, 
+      home: const MainSkeleton(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
+
+
 
 class MainSkeleton extends StatefulWidget {
   const MainSkeleton({super.key});
