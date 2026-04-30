@@ -1,4 +1,4 @@
-# busan_fush_app
+# busan_fish_app
 
 A new Flutter project.
 
