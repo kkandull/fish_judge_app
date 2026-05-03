@@ -5,9 +5,14 @@ class ShopScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text('초보자 패키지 추천 (쿠팡 연동) 화면', 
-        style: TextStyle(fontSize: 20)),
-    );
+    return Scaffold(
+    appBar: AppBar(
+      title: const Text('장비 추천', style: TextStyle(fontWeight: FontWeight.bold)),
+      centerTitle: true,
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+    ),
+    body: Center(child: Text("장비 추천 화면입니다")),
+  );
   }
 }

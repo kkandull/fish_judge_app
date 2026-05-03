@@ -5,9 +5,14 @@ class EncyclopediaScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text('나만의 낚시 도감 및 금어기 DB 화면', 
-        style: TextStyle(fontSize: 20)),
-    );
+    return Scaffold(
+    appBar: AppBar(
+      title: const Text('나만의 낚시 도감', style: TextStyle(fontWeight: FontWeight.bold)),
+      centerTitle: true,
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+    ),
+    body: Center(child: Text("낚시 도감")),
+  );
   }
 }

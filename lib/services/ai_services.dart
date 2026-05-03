@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:math'; // Softmax 계산을 위한 수학 라이브러리 추가
+import 'dart:math';
 import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
@@ -8,71 +8,94 @@ class AiService {
   late Interpreter interpreter;
   List<String>? labels;
 
-  // 1. 모델 및 라벨 로드
   Future<void> loadModel() async {
-    // TFLite 모델 불러오기
     interpreter = await Interpreter.fromAsset('assets/fish_model_float16.tflite');
-    
-    // 라벨(어종 이름) 불러오기
     final labelData = await rootBundle.loadString('assets/labels.txt');
-    labels = labelData.split('\n').where((s) => s.isNotEmpty).toList();
-    print("모델 및 라벨 로드 완료: $labels");
+    
+    // 🔥 핵심 수정: .map((s) => s.trim()) 을 추가하여 보이지 않는 공백과 줄바꿈 문자를 완벽하게 날려버립니다!
+    labels = labelData.split('\n').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    
+    print("✅ 모델 로드 완료! Input Shape: ${interpreter.getInputTensor(0).shape}");
+    print("✅ 라벨 목록(공백 제거됨): $labels"); // 디버깅용 출력
   }
 
-  // Logit 값을 0~1 사이의 확률로 변환해 주는 함수 (Softmax)
   List<double> _applySoftmax(List<double> logits) {
-    double maxLogit = logits.reduce(max); // 오버플로우 방지
+    double maxLogit = logits.reduce(max);
     List<double> expValues = logits.map((e) => exp(e - maxLogit)).toList();
     double sumExp = expValues.reduce((a, b) => a + b);
     return expValues.map((e) => e / sumExp).toList();
   }
 
-  // 2. 이미지 전처리 및 추론
   Future<Map<String, dynamic>> predict(File imageFile) async {
-    // 이미지 디코딩 및 리사이징 (224x224)
-    //final rawImage = img.decodeImage(imageFile.readAsBytesSync())!;
-    //final resizedImage = img.copyResize(rawImage, width: 224, height: 224);
-    final rawImage = img.decodeImage(imageFile.readAsBytesSync())!;
-    int size = min(rawImage.width, rawImage.height);
-    int x = (rawImage.width - size) ~/ 2;
-    int y = (rawImage.height - size) ~/ 2;
-    // 3. 가운데 부분만 정사각형으로 잘라내기 (찌그러짐 방지!)
-    img.Image croppedImage = img.copyCrop(rawImage, x: x, y: y, width: size, height: size);
-    
-    // 4. 잘라낸 정사각형 이미지를 모델 크기(224x224)로 깔끔하게 리사이징
-    final resizedImage = img.copyResize(croppedImage, width: 224, height: 224);
-    // 모델 입력 형태에 맞게 변환 [1, 224, 224, 3] 및 정규화 (0~1)
-    var input = List.generate(1, (i) =>
-        List.generate(224, (j) =>
-            List.generate(224, (k) =>
-                [
-                  (resizedImage.getPixel(k, j).r / 255.0),
-                  (resizedImage.getPixel(k, j).g / 255.0),
-                  (resizedImage.getPixel(k, j).b / 255.0),
-                ]
+    try {
+      final rawImage = img.decodeImage(imageFile.readAsBytesSync())!;
+      int size = min(rawImage.width, rawImage.height);
+      int x = (rawImage.width - size) ~/ 2;
+      int y = (rawImage.height - size) ~/ 2;
+      
+      img.Image croppedImage = img.copyCrop(rawImage, x: x, y: y, width: size, height: size);
+      final resizedImage = img.copyResize(croppedImage, width: 224, height: 224);
+      
+      final mean = [0.485, 0.456, 0.406];
+      final std = [0.229, 0.224, 0.225];
+
+      var inputShape = interpreter.getInputTensor(0).shape;
+      Object input;
+
+      // 🔥 피드백 1: 모든 배열에 제네릭(<double>)을 강제 주입하여 TFLite 충돌 완벽 방지
+      if (inputShape.length == 4 && inputShape[1] == 3) {
+        // NCHW 포맷 (파이토치 원본 형태)
+        input = [
+          List<List<List<double>>>.generate(3, (c) => 
+            List<List<double>>.generate(224, (y) => 
+              List<double>.generate(224, (x) {
+                final pixel = resizedImage.getPixel(x, y);
+                double pixelValue = 0.0;
+                if (c == 0) pixelValue = pixel.r / 255.0;
+                if (c == 1) pixelValue = pixel.g / 255.0;
+                if (c == 2) pixelValue = pixel.b / 255.0;
+                return (pixelValue - mean[c]) / std[c];
+              })
             )
-        )
-    );
+          )
+        ];
+      } else {
+        // NHWC 포맷 (텐서플로 라이트 최적화 형태)
+        input = [
+          List<List<List<double>>>.generate(224, (y) => 
+            List<List<double>>.generate(224, (x) {
+              final pixel = resizedImage.getPixel(x, y);
+              return <double>[
+                (pixel.r / 255.0 - mean[0]) / std[0],
+                (pixel.g / 255.0 - mean[1]) / std[1],
+                (pixel.b / 255.0 - mean[2]) / std[2],
+              ];
+            })
+          )
+        ];
+      }
 
-    // 출력 결과를 담을 리스트 (라벨 개수만큼 공간 확보)
-    var output = List.generate(1, (i) => List.filled(labels!.length, 0.0));
+      // 🔥 피드백 2: 출력 배열 역시 강타입(Strong Type)으로 초기화
+      var output = [List<double>.filled(labels!.length, 0.0)];
+      
+      // 모델 추론 실행
+      interpreter.run(input, output);
 
-    // 모델 추론 실행
-    interpreter.run(input, output);
+      // 🔥 피드백 3: 불필요한 cast() 제거
+      List<double> logits = output[0];
+      List<double> probabilities = _applySoftmax(logits);
 
-    // 1. 모델에서 나온 원시 결과값(Logit) 가져오기
-    List<double> logits = (output[0] as List).cast<double>();
-    
-    // 2. Softmax를 적용하여 0~1 사이의 진짜 '확률'로 변환
-    List<double> probabilities = _applySoftmax(logits);
+      double maxProb = probabilities.reduce(max);
+      int maxIndex = probabilities.indexOf(maxProb);
 
-    // 3. 가장 높은 확률과 그 인덱스(순서) 찾기
-    double maxProb = probabilities.reduce(max);
-    int maxIndex = probabilities.indexOf(maxProb);
-
-    return {
-      'label': labels![maxIndex], // 라벨에서 해당 어종 이름 찾기
-      'confidence': maxProb,      // 0~1 사이의 확률값
-    };
+      return {
+        'label': labels![maxIndex], 
+        'confidence': maxProb,      
+      };
+    } catch (e) {
+      // 이제 에러가 나더라도 터미널에 정확한 이유가 찍힙니다.
+      print("🚨 AI 분석 중 치명적 오류 발생: $e");
+      rethrow; 
+    }
   }
 }
