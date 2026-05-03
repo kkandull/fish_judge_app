@@ -5,10 +5,14 @@ class WeatherScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text('실시간 날씨 및 수온 화면\n(기상청 API 연동 예정)', 
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 20)),
-    );
+    return Scaffold(
+    appBar: AppBar(
+      title: const Text('날씨/수온', style: TextStyle(fontWeight: FontWeight.bold)),
+      centerTitle: true,
+      backgroundColor: Colors.white,
+      surfaceTintColor: Colors.white,
+    ),
+    body: Center(child: Text("날씨 화면입니다")),
+  );
   }
 }
