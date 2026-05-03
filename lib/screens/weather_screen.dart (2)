@@ -1,0 +1,80 @@
+import 'package:flutter/material.dart';
+// 방금 만든 서비스 파일을 연결합니다. 경로에 주의하세요!
+import '../services/weather_api_service.dart';
+
+class WeatherScreen extends StatefulWidget {
+  const WeatherScreen({Key? key}) : super(key: key);
+
+  @override
+  State<WeatherScreen> createState() => _WeatherScreenState();
+}
+
+class _WeatherScreenState extends State<WeatherScreen> {
+  final WeatherApiService _apiService = WeatherApiService();
+  late Future<Map<String, dynamic>> _weatherData;
+
+  @override
+  void initState() {
+    super.initState();
+    // 화면이 켜질 때 API 데이터를 요청합니다.
+    _weatherData = _apiService.fetchWeatherData();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('현재 기상 및 바다 정보'),
+        backgroundColor: Colors.blueAccent,
+      ),
+      body: Center(
+        // [조장님 필수 지시사항 1] FutureBuilder 사용
+        child: FutureBuilder<Map<String, dynamic>>(
+          future: _weatherData,
+          builder: (context, snapshot) {
+            
+            // [조장님 필수 지시사항 2] 로딩 중일 때 빙글빙글(CircularProgressIndicator) 띄우기
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const CircularProgressIndicator();
+            }
+            
+            if (snapshot.hasError || !snapshot.hasData || snapshot.data!.isEmpty) {
+              return const Text('데이터를 불러오지 못했습니다.');
+            }
+
+            final data = snapshot.data!;
+            
+            // [조장님 필수 지시사항 3] 데이터가 null이면 '정보 없음'으로 처리하여 앱 튕김 방지
+            final temp = data['temperature'] ?? '정보 없음';
+            final waterTemp = data['waterTemp'] ?? '정보 없음'; // 임의로 null을 넣었으니 '정보 없음'이 떠야 정상!
+            final waveHeight = data['waveHeight'] ?? '정보 없음';
+
+            return Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                child: Padding(
+                  padding: const EdgeInsets.all(32.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.water, size: 64, color: Colors.blue),
+                      const SizedBox(height: 20),
+                      Text('기온: $temp °C', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      // 화면에 진짜 '정보 없음'이라고 잘 뜨는지 확인하세요!
+                      Text('수온: $waterTemp', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      Text('파고: $waveHeight m', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
