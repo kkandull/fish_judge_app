@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import '../services/ai_services.dart';
 import '../services/regulation_service.dart';
 import 'measurement_screen.dart';
+import 'encyclopedia_screen.dart'; 
 
 class AiScanScreen extends StatefulWidget {
   const AiScanScreen({super.key});
@@ -27,7 +28,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
   }
 
   Future<void> _initAllServices() async {
-    await _aiService.loadModel();
+    await _aiService.loadModel(); // MobileNetV3 로드
     await _regulationService.loadRegulations();
     try {
       final cameras = await availableCameras();
@@ -131,7 +132,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
     );
   }
 
-  // ✨ 결과 바텀 시트
+  // ✨ 결과 바텀 시트 (도감 연동 버튼 추가됨!)
   void _showResultBottomSheet(Map<String, dynamic> result, File file) {
     double confidence = result['confidence']; 
     String label = result['label'];
@@ -153,6 +154,28 @@ class _AiScanScreenState extends State<AiScanScreen> {
             const SizedBox(height: 15),
             Text(isSuccess ? "🐟 $label" : "🚨 어종 인식 실패", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isSuccess ? Colors.black87 : Colors.redAccent)),
             const SizedBox(height: 20),
+            
+            // ✨ [여기를 추가해 주세요!] 인식 실패 시 나타나는 안내 문구
+            if (!isSuccess)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50, 
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.red.shade100)
+                ),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("💡 다시 한 번 찍어주세요!", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+                    SizedBox(height: 8),
+                    Text("• 물고기가 파란색 가이드라인 중앙에 오도록 맞춰주세요.\n• 너무 멀거나 어두우면 AI가 헷갈려 할 수 있어요.\n• 물고기의 측면(옆면)이 잘 보이게 찍어주세요.", 
+                      style: TextStyle(fontSize: 13, color: Colors.black87, height: 1.4)
+                    ),
+                  ],
+                ),
+              ),
             if (isSuccess && reg != null)
               Container(
                 padding: const EdgeInsets.all(16),
@@ -162,7 +185,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
                   border: Border.all(color: isPro ? Colors.red.shade100 : Colors.blue.shade100)
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, // [추가] 왼쪽 정렬
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(children: [
                       Icon(isPro ? Icons.warning : Icons.info, color: isPro ? Colors.red : Colors.blue),
@@ -171,44 +194,75 @@ class _AiScanScreenState extends State<AiScanScreen> {
                       const Spacer(),
                       ElevatedButton.icon(
                         onPressed: () {
-                          Navigator.push(
-                            context, 
-                            MaterialPageRoute(
-                              builder: (context) => MeasurementScreen(imageFile: file, label: label)
-                            )
-                          );
+                          Navigator.push(context, MaterialPageRoute(builder: (context) => MeasurementScreen(imageFile: file, label: label)));
                         }, 
                         icon: const Icon(Icons.straighten, size: 14, color: Colors.blueAccent),
                         label: const Text("신발로 크기 측정", style: TextStyle(fontSize: 12, color: Colors.blueAccent, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue.shade50, 
-                          elevation: 0, 
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.blue.shade200))
-                        ),
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade50, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.blue.shade200))),
                       ),
                     ]),
                     const Divider(height: 20),
                     Text("• 금어기: ${reg["금어기"]}"),
                     Text("• 금지체장: ${reg["금지체장"]}"),
-                    
-                    // ✨ [추가] 비고(부산 기준)가 있을 때만 화면에 표시
                     if (reg["비고"] != null && reg["비고"].toString().isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 8.0),
-                        child: Text(
-                          "${reg["비고"]}", 
-                          style: TextStyle(fontSize: 11, color: Colors.grey[600], fontStyle: FontStyle.italic)
-                        ),
+                        child: Text("${reg["비고"]}", style: TextStyle(fontSize: 11, color: Colors.grey[600], fontStyle: FontStyle.italic)),
                       ),
                   ],
                 ),
               ),
+            
             const SizedBox(height: 20),
-            SizedBox(width: double.infinity, height: 50, child: ElevatedButton(onPressed: () => Navigator.pop(sc), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF007AFF), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text("확인", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)))),
+
+            // ✨ [새로 추가된 기능] 인식 성공 시 '내 도감에 저장' 버튼 표시
+            if (isSuccess)
+              SizedBox(
+                width: double.infinity, 
+                height: 50, 
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(sc); // 바텀시트 먼저 닫기
+                    // 🚀 도감 화면으로 사진과 이름 넘겨주기!
+                    Navigator.push(
+                      context, 
+                      MaterialPageRoute(
+                        builder: (context) => EncyclopediaScreen(
+                          capturedImage: file, 
+                          targetFish: label
+                        )
+                      )
+                    );
+                  }, 
+                  icon: const Icon(Icons.book, color: Colors.white),
+                  label: const Text("내 도감에 저장 및 확인", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal, // 친환경적인 느낌의 색상
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                  )
+                )
+              ),
+            
+            if (isSuccess) const SizedBox(height: 10),
+
+            // 기존 닫기 버튼 (디자인을 회색으로 낮춰서 도감 버튼이 돋보이게 함)
+            SizedBox(
+              width: double.infinity, 
+              height: 50, 
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(sc), 
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey.shade200, 
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+                ), 
+                child: const Text("닫기", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold))
+              )
+            ),
+            
             TextButton(
               onPressed: () {
                 Navigator.pop(sc);
-                // [개선] 더 친절해진 오답 신고 멘트
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('오답 신고가 접수되었습니다. 더 나은 결과를 보답하도록 노력하겠습니다.'), behavior: SnackBarBehavior.floating));
               }, 
               child: const Text("결과가 틀렸나요? (오답 신고)", style: TextStyle(color: Colors.grey, fontSize: 12, decoration: TextDecoration.underline))
@@ -227,14 +281,11 @@ class _AiScanScreenState extends State<AiScanScreen> {
       body: Stack(
         children: [
           Positioned.fill(child: CameraPreview(_cameraController!)),
-          // 가이드 오버레이
           Positioned.fill(child: ColorFiltered(colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.5), BlendMode.srcOut), child: Stack(children: [Container(color: Colors.transparent), Align(alignment: Alignment.center, child: Container(width: 280, height: 280, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(30))))]))),
           Align(alignment: Alignment.center, child: Container(width: 280, height: 280, decoration: BoxDecoration(border: Border.all(color: const Color(0xFF007AFF), width: 3), borderRadius: BorderRadius.circular(30)))),
           
-          // 📢 상단 안내 문구
           Positioned(top: 60, left: 0, right: 0, child: Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10), decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(20)), child: const Text("🐟 가이드라인 안에 물고기를 맞추세요", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))))),
 
-          // 💡 튜토리얼 유도 버튼 (아이콘 + 말풍선)
           Positioned(
             top: 55, right: 15,
             child: Column(
@@ -254,7 +305,6 @@ class _AiScanScreenState extends State<AiScanScreen> {
             ),
           ),
 
-          // 하단 셔터 버튼
           Positioned(bottom: 100, left: 0, right: 0, child: Center(child: _isAnalyzing ? const CircularProgressIndicator() : GestureDetector(onTap: _takeAndAnalyzePhoto, child: Container(width: 70, height: 70, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 4), color: Colors.white.withOpacity(0.2)), child: Center(child: Container(width: 55, height: 55, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white))))))),
         ],
       ),

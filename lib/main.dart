@@ -120,7 +120,7 @@ class _MainSkeletonState extends State<MainSkeleton> {
               BottomNavigationBarItem(
                 icon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.shopping_cart_outlined, size: 26)),
                 activeIcon: Padding(padding: EdgeInsets.only(bottom: 4), child: Icon(Icons.shopping_cart, size: 26)),
-                label: '장비 추천',
+                label: '샵/내정보',
               ),
             ],
           ),
