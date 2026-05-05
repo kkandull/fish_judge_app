@@ -32,7 +32,7 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
     },
   ];
 
-  // 어종별 데이터 (rodUrl 제거 및 제공해주신 데이터 반영)
+  // 어종별 데이터
   final List<Map<String, String>> fishData = [
     {
       "name": "감성돔",
@@ -133,6 +133,93 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
     }
   }
 
+  // 💡 [추가됨] 파일명(밀리초 타임스탬프)에서 날짜와 시간을 예쁘게 추출하는 함수
+  String _getFormattedDateFromPath(String path) {
+    try {
+      String fileName = p.basename(path); // 예: 1683928371923_image.jpg
+      String timeStr = fileName.split('_')[0]; // 언더바 앞의 밀리초만 추출
+      int millis = int.parse(timeStr);
+      DateTime date = DateTime.fromMillisecondsSinceEpoch(millis);
+      
+      String amPm = date.hour < 12 ? '오전' : '오후';
+      int hour = date.hour > 12 ? date.hour - 12 : (date.hour == 0 ? 12 : date.hour);
+      
+      return "${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')} $amPm $hour:${date.minute.toString().padLeft(2, '0')}";
+    } catch (e) {
+      return "날짜 정보 없음"; // 오류 발생 시 기본값 (예전 방식의 파일명일 경우)
+    }
+  }
+
+  // 💡 [추가됨] 도감 상세 보기 팝업 함수
+  void _showFishDetailPopup(BuildContext context, String fishName, String imagePath, String catchDate) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 10,
+          backgroundColor: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min, 
+              children: [
+                Text(
+                  fishName,
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF1976D2)),
+                ),
+                const SizedBox(height: 16),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.file( // File 이미지 렌더링
+                    File(imagePath), 
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: 280,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_month_rounded, color: Colors.black54, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          "포획 일시: $catchDate",
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2B3A55),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(), 
+                    child: const Text('닫기', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -155,7 +242,6 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 1. 공용 장비 섹션
           const Text(
             "필수 공용 장비",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -199,7 +285,6 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
           ),
           const SizedBox(height: 12),
 
-          // 2. 어종별 리스트 섹션
           ...fishData.map((fish) {
             final String name = fish['name'] ?? 'Unknown';
             final List<String> imagePathList = collectionMap[name] ?? [];
@@ -221,20 +306,28 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
                         itemCount: imagePathList.length,
                         itemBuilder: (context, imgIndex) {
                           final path = imagePathList[imgIndex];
-                          return Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.file(
-                                File(path),
-                                width: 220,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Container(
-                                      width: 220,
-                                      color: Colors.grey.shade200,
-                                      child: const Icon(Icons.broken_image),
-                                    ),
+                          // 💡 [추가됨] 사진을 터치 가능하도록 GestureDetector로 감싸기
+                          return GestureDetector(
+                            onTap: () {
+                              // 경로에서 날짜 추출 후 팝업 띄우기!
+                              String dateStr = _getFormattedDateFromPath(path);
+                              _showFishDetailPopup(context, name, path, dateStr);
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.file(
+                                  File(path),
+                                  width: 220,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Container(
+                                        width: 220,
+                                        color: Colors.grey.shade200,
+                                        child: const Icon(Icons.broken_image),
+                                      ),
+                                ),
                               ),
                             ),
                           );
