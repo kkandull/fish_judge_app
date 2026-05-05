@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  runApp(const MaterialApp(
-    home: ShopScreen(),
-    debugShowCheckedModeBanner: false,
-  ));
-}
+
 
 class ShopScreen extends StatefulWidget {
   const ShopScreen({super.key});
