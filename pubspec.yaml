@@ -21,7 +21,7 @@ dependencies:
   http: ^1.2.1             # [표재국 담당] 기상청/바다타임 API 통신용
   url_launcher: ^6.2.6     # [강태한/김승연 담당] 쿠팡 장비 추천 및 주변 편의시설 지도 링크 연결용
   geolocator: ^11.0.1      # [표재국 담당] 위치 기반 사고 위험(테트라포드 등) 안내용 GPS 패키지
-  shared_preferences: ^2.2.3
+  shared_preferences: ^2.5.5
   path_provider: ^2.1.2
   path: ^1.9.0
 
