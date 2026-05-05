@@ -39,7 +39,7 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
       "tackleUrl": "https://www.coupang.com/np/search?q=바다+찌낚시+채비세트"
     },
     {
-      "name": "넙치",
+      "name": "광어",
       "tackleUrl": "https://www.coupang.com/np/search?q=광어+프리리그+채비"
     },
     {
