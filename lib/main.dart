@@ -31,7 +31,7 @@ class SmartFishingApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Busan Fish App', 
+      title: '나우피싱',
       debugShowCheckedModeBanner: false, // 우측 상단 디버그 띠 제거
       theme: ThemeData(
         useMaterial3: true,
