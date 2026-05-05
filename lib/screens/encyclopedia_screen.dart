@@ -1,21 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-// TODO 1: pubspec.yaml에 url_launcher: ^6.2.6, shared_preferences: ^2.2.3 추가 후 주석을 해제하세요.
-// import 'package:url_launcher/url_launcher.dart';
-// import 'package:shared_preferences/shared_preferences.dart';
-
-// 🎯 [강태한 담당] 나만의 낚시 도감 + 장비 추천 통합 화면
-// 
-// 💡 [기획 의도 및 개발 가이드]
-// 1. 나만의 도감 (로컬 DB 연동): AI 카메라에서 넘어온 사진(capturedImage)과 어종(targetFish)을 
-//    shared_preferences에 저장하세요. 앱을 재실행해도 내가 잡은 고기 사진이 도감에 유지되어야 합니다.
-// 2. 데이터 리팩토링: 하드코딩하지 말고, 부산 5대 어종(감성돔, 벵에돔 등) 데이터를 
-//    List<Map>으로 구성해 ListView.builder로 효율적으로 화면을 그리세요.
-// 3. 수익화 연동: 각 어종 카드 하단에 [쿠팡 추천 장비 구매] 버튼을 배치해 url_launcher로 연결하세요.
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class EncyclopediaScreen extends StatefulWidget {
-  final File? capturedImage; // AI 스캔 화면에서 방금 찍은 사진
-  final String? targetFish;  // AI가 인식한 물고기 이름
+  final File? capturedImage;
+  final String? targetFish;
 
   const EncyclopediaScreen({super.key, this.capturedImage, this.targetFish});
 
@@ -24,31 +16,264 @@ class EncyclopediaScreen extends StatefulWidget {
 }
 
 class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
-  // TODO 2: 어종 데이터 리스트(List<Map>)와 로컬 DB에서 불러온 수집 상태 데이터를 선언하세요.
+  // 공용 장비 데이터
+  final List<Map<String, String>> commonGear = [
+    {
+      "name": "낚시대+릴",
+      "url": "https://www.coupang.com/np/search?q=JAHCHO 캠핑 바다낚시 입문자용 다용도 미니 낚시대 세트"
+    },
+    {
+      "name": "두레박",
+      "url": "https://www.coupang.com/np/search?q=낚시+잇츠온 EVA 접이식 두레박"
+    },
+    {
+      "name": "가위, 집개",
+      "url": "https://www.coupang.com/np/search?q=다용도 스테인리스 낚시 가위 겸용 집게 컨트롤 플라이어"
+    },
+  ];
+
+  // 어종별 데이터 (rodUrl 제거 및 제공해주신 데이터 반영)
+  final List<Map<String, String>> fishData = [
+    {
+      "name": "감성돔",
+      "tackleUrl": "https://www.coupang.com/np/search?q=바다+찌낚시+채비세트"
+    },
+    {
+      "name": "넙치",
+      "tackleUrl": "https://www.coupang.com/np/search?q=광어+프리리그+채비"
+    },
+    {
+      "name": "우럭",
+      "tackleUrl": "https://www.coupang.com/np/search?q=지그헤드+웜+세트"
+    },
+    {
+      "name": "쥐노래미",
+      "tackleUrl": "https://www.coupang.com/np/search?q=지그헤드+웜+세트"
+    },
+    {
+      "name": "참돔",
+      "tackleUrl": "https://www.coupang.com/np/search?q=쇼어+타이라바"
+    },
+  ];
+
+  Map<String, List<String>> collectionMap = {};
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadEncyclopediaData();
+    _initData();
   }
 
-  Future<void> _loadEncyclopediaData() async {
-    // TODO 3: SharedPreferences를 사용해 기존에 저장된 사진 경로들을 불러오고, 
-    // 새로 넘어온 widget.capturedImage가 있다면 DB에 새로 저장하는 로직을 짜주세요.
+  Future<void> _initData() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    for (var fish in fishData) {
+      String name = fish['name']!;
+      List<String>? savedList = prefs.getStringList(name);
+      collectionMap[name] = savedList ?? [];
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+
+    if (widget.targetFish != null && widget.capturedImage != null) {
+      if (fishData.any((fish) => fish['name'] == widget.targetFish)) {
+        await _saveImagePermanently(
+          widget.targetFish!,
+          widget.capturedImage!,
+          prefs,
+        );
+      }
+    }
+  }
+
+  Future<void> _saveImagePermanently(
+      String fishName,
+      File tempFile,
+      SharedPreferences prefs,
+      ) async {
+    try {
+      final directory = await getApplicationDocumentsDirectory();
+      final fishDir = Directory('${directory.path}/$fishName');
+      if (!await fishDir.exists()) {
+        await fishDir.create(recursive: true);
+      }
+
+      final fileName =
+          "${DateTime.now().millisecondsSinceEpoch}_${p.basename(tempFile.path)}";
+      final permanentFile = await tempFile.copy('${fishDir.path}/$fileName');
+
+      List<String> currentList = prefs.getStringList(fishName) ?? [];
+      if (!currentList.contains(permanentFile.path)) {
+        currentList.add(permanentFile.path);
+        await prefs.setStringList(fishName, currentList);
+
+        if (mounted) {
+          setState(() {
+            collectionMap[fishName] = currentList;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("파일 저장 중 오류 발생: $e");
+    }
+  }
+
+  Future<void> _launchURL(String? urlString) async {
+    if (urlString == null) return;
+    final Uri url = Uri.parse(urlString);
+    try {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint("Could not launch $url : $e");
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
-        title: const Text('내 도감 및 장비 추천', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          '내 도감 및 장비 추천',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
+        elevation: 0,
       ),
-      // TODO 4: ListView.builder를 사용하여 어종 리스트를 만드세요.
-      // 수집된 어종은 '내가 찍은 사진'을, 미수집 어종은 '기본 일러스트'를 보여줘야 합니다.
-      body: const Center(child: Text("ListView.builder를 구현해 주세요!")),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // 1. 공용 장비 섹션
+          const Text(
+            "필수 공용 장비",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: commonGear.length,
+              itemBuilder: (context, index) {
+                return Container(
+                  width: 160,
+                  margin: const EdgeInsets.only(right: 12),
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.blueAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: const BorderSide(color: Colors.blueAccent),
+                      ),
+                    ),
+                    onPressed: () => _launchURL(commonGear[index]['url']),
+                    child: Text(
+                      commonGear[index]['name']!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 24),
+          const Divider(),
+          const SizedBox(height: 12),
+          const Text(
+            "어종별 수집 현황 및 추천 채비",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+
+          // 2. 어종별 리스트 섹션
+          ...fishData.map((fish) {
+            final String name = fish['name'] ?? 'Unknown';
+            final List<String> imagePathList = collectionMap[name] ?? [];
+            final bool isCollected = imagePathList.isNotEmpty;
+
+            return Card(
+              margin: const EdgeInsets.only(bottom: 16),
+              clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  if (isCollected)
+                    SizedBox(
+                      height: 180,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: imagePathList.length,
+                        itemBuilder: (context, imgIndex) {
+                          final path = imagePathList[imgIndex];
+                          return Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(
+                                File(path),
+                                width: 220,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                      width: 220,
+                                      color: Colors.grey.shade200,
+                                      child: const Icon(Icons.broken_image),
+                                    ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    )
+                  else
+                    Container(
+                      height: 150,
+                      color: Colors.grey.shade300,
+                      child: const Center(
+                        child: Text(
+                          "미수집 어종",
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ListTile(
+                    title: Text(
+                      name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(isCollected ? "수집 완료 (${imagePathList.length})" : "미수집"),
+                    trailing: ElevatedButton.icon(
+                      onPressed: () => _launchURL(fish['tackleUrl']),
+                      icon: const Icon(Icons.shopping_cart, size: 16),
+                      label: const Text("채비 구매"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 }
