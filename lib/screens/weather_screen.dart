@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
@@ -43,15 +44,14 @@ class _WeatherScreenState extends State<WeatherScreen>
   bool _isDangerZone = false;
   String _currentDangerPlace = "";
   bool _isDismissedManually = false;
-
-  // ✅ 추가: 리로드 버튼 스피너용
   bool _isRefreshing = false;
 
   late AnimationController _blinkController;
   late AnimationController _floatController;
 
+  // ✅ 공공데이터포털 서비스 키 (기상청 + 국립해양조사원 공통)
   final String apiKey =
-      'ad7fabf94911978da64e3ef42abbf6f9097211711390790b71b9a32fc7af34e7';
+      'cdd83e12a3b04b72dfbc96976e346cd1625e1bd75790c0886e5b4a00a3dd8be3';
 
   final List<Map<String, dynamic>> dangerPoints = [
     {'name': '해운대 마린시티', 'lat': 35.1587, 'lng': 129.1601},
@@ -95,41 +95,48 @@ class _WeatherScreenState extends State<WeatherScreen>
       permission = await Geolocator.requestPermission();
     }
 
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high, distanceFilter: 10),
-    ).listen((Position position) {
-      bool foundDanger = false;
-      String placeName = "";
+    _positionStream =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 10,
+          ),
+        ).listen((Position position) {
+          bool foundDanger = false;
+          String placeName = "";
 
-      for (var point in dangerPoints) {
-        double distance = Geolocator.distanceBetween(
-            position.latitude, position.longitude, point['lat'], point['lng']);
-        if (distance <= 100) {
-          foundDanger = true;
-          placeName = point['name'];
-          break;
-        }
-      }
+          for (var point in dangerPoints) {
+            double distance = Geolocator.distanceBetween(
+              position.latitude,
+              position.longitude,
+              point['lat'],
+              point['lng'],
+            );
+            if (distance <= 100) {
+              foundDanger = true;
+              placeName = point['name'];
+              break;
+            }
+          }
 
-      if (foundDanger) {
-        if (_currentDangerPlace != placeName) {
-          setState(() {
-            _isDangerZone = true;
-            _currentDangerPlace = placeName;
-            _isDismissedManually = false;
-          });
-        }
-      } else {
-        if (_isDangerZone || _currentDangerPlace.isNotEmpty) {
-          setState(() {
-            _isDangerZone = false;
-            _currentDangerPlace = "";
-            _isDismissedManually = false;
-          });
-        }
-      }
-    });
+          if (foundDanger) {
+            if (_currentDangerPlace != placeName) {
+              setState(() {
+                _isDangerZone = true;
+                _currentDangerPlace = placeName;
+                _isDismissedManually = false;
+              });
+            }
+          } else {
+            if (_isDangerZone || _currentDangerPlace.isNotEmpty) {
+              setState(() {
+                _isDangerZone = false;
+                _currentDangerPlace = "";
+                _isDismissedManually = false;
+              });
+            }
+          }
+        });
   }
 
   String _formatDate(DateTime date) {
@@ -137,59 +144,110 @@ class _WeatherScreenState extends State<WeatherScreen>
   }
 
   String _getWindDirectionStr(double degree) {
-    List<String> directions = [
-      "북", "북북동", "북동", "동북동", "동", "동남동", "남동", "남남동",
-      "남", "남남서", "남서", "서남서", "서", "서북서", "북서", "북북서", "북"
+    const directions = [
+      "북",
+      "북북동",
+      "북동",
+      "동북동",
+      "동",
+      "동남동",
+      "남동",
+      "남남동",
+      "남",
+      "남남서",
+      "남서",
+      "서남서",
+      "서",
+      "서북서",
+      "북서",
+      "북북서",
+      "북",
     ];
     int index = ((degree + 11.25) % 360 / 22.5).floor();
     return "${directions[index]}풍";
   }
 
-  // ✅ 핵심 최적화: 오프라인 체크 + 두 API를 Future.wait으로 병렬 실행
+  Future<bool> _checkInternet() async {
+    try {
+      final result = await InternetAddress.lookup(
+        'google.com',
+      ).timeout(const Duration(seconds: 2));
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<WeatherScreenData> _fetchAllData() async {
     final now = DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
 
-    // 1. 오프라인 체크 (타임아웃 단축: 1.5초)
-    bool offlineMode = false;
-    try {
-      final result = await InternetAddress.lookup('google.com')
-          .timeout(const Duration(seconds: 2));
-      if (result.isEmpty || result[0].rawAddress.isEmpty) offlineMode = true;
-    } catch (_) {
-      offlineMode = true;
-    }
+    const String defaultTemp = '18.5°C';
+    const String defaultWind = '2.3m/s';
+    const String defaultWindDir = '북서풍';
+    const double defaultWindDeg = 315.0;
+    const String defaultWave = '0.5m 내외';
+    const String defaultWater = '16.2°C';
 
-    // 기본값
-    String temp = '18.5°C';
-    String wind = '2.3m/s';
-    String windDir = "풍향 미상";
-    double windDeg = 0.0;
-    String wave = '0.5m 내외';
-    String water = '16.2°C';
+    final bool isOnline = await _checkInternet();
 
-    if (!offlineMode) {
-      // ✅ 두 API를 동시에 호출 (직렬 → 병렬, 이게 핵심 최적화)
-      final results = await Future.wait([
-        _fetchKmaData(now),
-        _fetchWaterTempData(now),
-      ]);
+    String temp = defaultTemp;
+    String wind = defaultWind;
+    String windDir = defaultWindDir;
+    double windDeg = defaultWindDeg;
+    String wave = defaultWave;
+    String water = defaultWater;
+    DateTime updateTime = now;
 
-      // KMA 결과 파싱
-      final kmaResult = results[0] as Map<String, String>?;
+    if (isOnline) {
+      // ── 기상청 초단기실황 API (변경 없음) ──────────────────
+      final kmaResult = await _fetchKmaData(now);
       if (kmaResult != null) {
-        temp = kmaResult['temp'] ?? temp;
-        wind = kmaResult['wind'] ?? wind;
-        windDir = kmaResult['windDir'] ?? windDir;
-        windDeg = double.tryParse(kmaResult['windDeg'] ?? '0') ?? 0.0;
+        temp = kmaResult['temp'] ?? defaultTemp;
+        wind = kmaResult['wind'] ?? defaultWind;
+        windDir = kmaResult['windDir'] ?? defaultWindDir;
+        windDeg = double.tryParse(kmaResult['windDeg'] ?? '') ?? defaultWindDeg;
+
+        await prefs.setString('cached_temp', temp);
+        await prefs.setString('cached_wind', wind);
+        await prefs.setString('cached_windDir', windDir);
+        await prefs.setDouble('cached_windDeg', windDeg);
+        await prefs.setString('cached_time', now.toIso8601String());
+        updateTime = now;
+      } else {
+        temp = prefs.getString('cached_temp') ?? defaultTemp;
+        wind = prefs.getString('cached_wind') ?? defaultWind;
+        windDir = prefs.getString('cached_windDir') ?? defaultWindDir;
+        windDeg = prefs.getDouble('cached_windDeg') ?? defaultWindDeg;
+        final cachedTimeStr = prefs.getString('cached_time');
+        updateTime = cachedTimeStr != null
+            ? (DateTime.tryParse(cachedTimeStr) ?? now)
+            : now;
       }
 
-      // 수온 결과 파싱
-      final waterResult = results[1] as String?;
-      if (waterResult != null) water = waterResult;
+      // ── 국립해양조사원 조위관측소 실측 수온 API ──────────────
+      final waterResult = await _fetchWaterTemp(now);
+      if (waterResult != null) {
+        water = waterResult;
+        await prefs.setString('cached_water', water);
+      } else {
+        water = prefs.getString('cached_water') ?? defaultWater;
+        debugPrint('수온 API 실패, 캐시 또는 기본값($water) 사용');
+      }
+    } else {
+      // ── 오프라인: 로컬 캐시 사용 ────────────────────────────
+      temp = prefs.getString('cached_temp') ?? defaultTemp;
+      wind = prefs.getString('cached_wind') ?? defaultWind;
+      windDir = prefs.getString('cached_windDir') ?? defaultWindDir;
+      windDeg = prefs.getDouble('cached_windDeg') ?? defaultWindDeg;
+      water = prefs.getString('cached_water') ?? defaultWater;
+      final cachedTimeStr = prefs.getString('cached_time');
+      updateTime = cachedTimeStr != null
+          ? (DateTime.tryParse(cachedTimeStr) ?? now)
+          : now;
     }
 
-    // 추천 어종 계산
-    final fish = _getRecommendedFish(now.month, water);
+    final fish = _getRecommendedFish(updateTime.month, water);
 
     return WeatherScreenData(
       temperature: temp,
@@ -199,37 +257,41 @@ class _WeatherScreenState extends State<WeatherScreen>
       waveHeight: wave,
       waterTemp: water,
       recommendedFish: fish,
-      isOffline: offlineMode,
-      updateTime: now,
+      isOffline: !isOnline,
+      updateTime: updateTime,
     );
   }
 
-  // ✅ KMA API 분리 (타임아웃 3초 유지, 에러 시 null 반환)
+  // ── 기상청 초단기실황 (변경 없음) ────────────────────────────
   Future<Map<String, String>?> _fetchKmaData(DateTime now) async {
     try {
-      DateTime kmaTime =
-          now.minute < 45 ? now.subtract(const Duration(hours: 1)) : now;
-      String baseDate = _formatDate(kmaTime);
-      String baseTime = "${kmaTime.hour.toString().padLeft(2, '0')}00";
+      final kmaTime = now.minute < 45
+          ? now.subtract(const Duration(hours: 1))
+          : now;
+      final baseDate = _formatDate(kmaTime);
+      final baseTime = "${kmaTime.hour.toString().padLeft(2, '0')}00";
 
-      String kmaUrl =
+      final url =
           'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getUltraSrtNcst'
           '?serviceKey=$apiKey&pageNo=1&numOfRows=100&dataType=JSON'
-          '&base_date=$baseDate&base_time=$baseTime&nx=98&ny=76';
+          '&base_date=$baseDate&base_time=$baseTime&nx=98&ny=73';
 
-      final kmaRes = await http
-          .get(Uri.parse(kmaUrl))
-          .timeout(const Duration(seconds: 3));
+      final res = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 5));
 
-      if (kmaRes.statusCode != 200) return null;
+      if (res.statusCode != 200) return null;
 
-      var res = jsonDecode(utf8.decode(kmaRes.bodyBytes));
-      if (res['response']?['header']?['resultCode'] != '00') return null;
+      final body = utf8.decode(res.bodyBytes);
+      if (body.trim().startsWith('<')) return null;
 
-      var items = res['response']['body']['items']['item'] as List;
+      final json = jsonDecode(body);
+      if (json['response']?['header']?['resultCode'] != '00') return null;
+
+      final items = json['response']['body']['items']['item'] as List;
       final result = <String, String>{};
 
-      for (var item in items) {
+      for (final item in items) {
         switch (item['category']) {
           case 'T1H':
             result['temp'] = '${item['obsrValue']}°C';
@@ -244,46 +306,104 @@ class _WeatherScreenState extends State<WeatherScreen>
             break;
         }
       }
-      return result;
+      return result.isEmpty ? null : result;
     } catch (e) {
-      debugPrint("기상청 API 수신 실패: $e");
+      debugPrint('기상청 예외: $e');
       return null;
     }
   }
 
-  // ✅ 수온 API 분리 (오늘 실패 시 어제 데이터 자동 재시도)
-  Future<String?> _fetchWaterTempData(DateTime now) async {
-    for (var date in [now, now.subtract(const Duration(days: 1))]) {
-      try {
-        String targetDate = _formatDate(date);
-        String waterUrl =
-            'https://apis.data.go.kr/1192136/roms/getOceanModel'
-            '?serviceKey=$apiKey&pageNo=1&numOfRows=10&dataType=JSON&date=$targetDate';
+  // ── ✅ 국립해양조사원 조위관측소 실측 수온 (신규 교체) ───────────
+  // Base URL: apis.data.go.kr/1192136/surveyWaterTemp
+  // API: /GetSurveyWaterTempApiService
+  // 부산 조위관측소 코드: DT_0019
+  Future<String?> _fetchWaterTemp(DateTime now) async {
+    const obsCodes = [
+      'DT_0019', // 부산항 (1순위)
+      'DT_0020', // 거제도 (2순위)
+      'DT_0063', // 가덕도 (3순위)
+      'DT_0021', // 통영   (4순위)
+    ];
 
-        final waterRes = await http
-            .get(Uri.parse(waterUrl))
-            .timeout(const Duration(seconds: 3));
+    for (final obsCode in obsCodes) {
+      for (int dayOffset = 0; dayOffset <= 1; dayOffset++) {
+        try {
+          final targetDate = _formatDate(
+            now.subtract(Duration(days: dayOffset)),
+          );
 
-        if (waterRes.statusCode != 200) continue;
+          final url =
+              'https://apis.data.go.kr/1192136/surveyWaterTemp/GetSurveyWaterTempApiService'
+              '?serviceKey=$apiKey'
+              '&pageNo=1'
+              '&numOfRows=24'
+              '&dataType=JSON'
+              '&obsCode=$obsCode'
+              '&date=$targetDate';
 
-        var resBody =
-            jsonDecode(utf8.decode(waterRes.bodyBytes))['response'];
-        var items = resBody?['body']?['items']?['item'] as List?;
+          debugPrint('수온 API 요청 ($obsCode, offset=$dayOffset)');
 
-        if (items != null && items.isNotEmpty && items[0]['water_temp'] != null) {
-          double wtValue = double.parse(items[0]['water_temp'].toString());
-          return '${wtValue.toStringAsFixed(1)}°C';
+          final res = await http
+              .get(Uri.parse(url))
+              .timeout(const Duration(seconds: 5));
+
+          if (res.statusCode != 200) continue;
+
+          final body = utf8.decode(res.bodyBytes);
+
+          // ✅ XML이어도 resultCode 00이면 파싱 시도
+          if (body.trim().startsWith('<')) {
+            // resultCode 40 = 관측소 점검 중 → 다음 관측소로
+            if (body.contains('<resultCode>40</resultCode>')) {
+              debugPrint('수온 관측소 점검 중 ($obsCode) → 다음으로');
+              break;
+            }
+
+            // resultCode 00 = 성공이지만 XML로 왔을 때 → XML 파싱
+            if (body.contains('<resultCode>00</resultCode>')) {
+              final wtMatch = RegExp(r'<wtem>([\d.]+)</wtem>').allMatches(body);
+              if (wtMatch.isNotEmpty) {
+                final vals = wtMatch
+                    .map((m) => double.tryParse(m.group(1) ?? ''))
+                    .whereType<double>()
+                    .toList();
+                if (vals.isNotEmpty) {
+                  final avg = vals.reduce((a, b) => a + b) / vals.length;
+                  debugPrint('✅ 수온 성공 XML파싱 ($obsCode): ${avg.toStringAsFixed(1)}°C');
+                  return '${avg.toStringAsFixed(1)}°C';
+                }
+              }
+            }
+
+            debugPrint('수온 알 수 없는 XML 에러 ($obsCode)');
+            break;
+          }
+
+          // JSON 응답 처리
+          final resJson = jsonDecode(body);
+          final items =
+              resJson['response']?['body']?['items']?['item'] as List?;
+
+          if (items != null && items.isNotEmpty) {
+            final latest = items.last;
+            final val = latest['wtem'] ?? latest['wtemp'] ?? latest['water_temp'];
+            if (val != null) {
+              final wtValue = double.parse(val.toString());
+              debugPrint('✅ 수온 성공 JSON ($obsCode): $wtValue°C');
+              return '${wtValue.toStringAsFixed(1)}°C';
+            }
+          }
+        } catch (e) {
+          debugPrint('수온 예외 ($obsCode, offset=$dayOffset): $e');
         }
-      } catch (e) {
-        debugPrint("수온 API 수신 실패: $e");
       }
     }
     return null;
   }
 
-  // ✅ 추천 어종 로직을 별도 함수로 분리 (순수 함수)
   String _getRecommendedFish(int month, String waterStr) {
-    double waterTemp = double.tryParse(waterStr.replaceAll('°C', '')) ?? 16.2;
+    final waterTemp =
+        double.tryParse(waterStr.replaceAll('°C', '').trim()) ?? 16.2;
 
     if (month >= 3 && month <= 5) {
       return waterTemp >= 15.0
@@ -302,7 +422,6 @@ class _WeatherScreenState extends State<WeatherScreen>
     }
   }
 
-  // ✅ 당겨서 새로고침 (RefreshIndicator용)
   Future<void> _handleRefresh() async {
     final newData = await _fetchAllData();
     if (mounted) {
@@ -312,9 +431,8 @@ class _WeatherScreenState extends State<WeatherScreen>
     }
   }
 
-  // ✅ 버튼 새로고침: _isRefreshing 상태로 스피너 표시
   Future<void> _handleButtonRefresh() async {
-    if (_isRefreshing) return; // 중복 탭 방지
+    if (_isRefreshing) return;
     setState(() => _isRefreshing = true);
     try {
       final newData = await _fetchAllData();
@@ -333,25 +451,27 @@ class _WeatherScreenState extends State<WeatherScreen>
     return FutureBuilder<WeatherScreenData>(
       future: _weatherDataFuture,
       builder: (context, snapshot) {
-        bool isLoading = snapshot.connectionState == ConnectionState.waiting;
-        final data = snapshot.data ??
+        final isLoading = snapshot.connectionState == ConnectionState.waiting;
+
+        final data =
+            snapshot.data ??
             WeatherScreenData(
-              temperature: '-',
-              windSpeed: '-',
-              windDirection: '-',
-              windAngle: 0.0,
-              waveHeight: '-',
-              waterTemp: '-',
-              recommendedFish: '데이터를 불러오는 중입니다.',
+              temperature: '18.5°C',
+              windSpeed: '2.3m/s',
+              windDirection: '북서풍',
+              windAngle: 315.0,
+              waveHeight: '0.5m 내외',
+              waterTemp: '16.2°C',
+              recommendedFish: '데이터를 불러오는 중입니다...',
               isOffline: false,
               updateTime: DateTime.now(),
             );
 
-        String amPm = data.updateTime.hour < 12 ? '오전' : '오후';
-        int hour = data.updateTime.hour > 12
+        final amPm = data.updateTime.hour < 12 ? '오전' : '오후';
+        final hour = data.updateTime.hour > 12
             ? data.updateTime.hour - 12
             : (data.updateTime.hour == 0 ? 12 : data.updateTime.hour);
-        String timeStr =
+        final timeStr =
             "${data.updateTime.year}.${data.updateTime.month.toString().padLeft(2, '0')}.${data.updateTime.day.toString().padLeft(2, '0')} $amPm $hour:${data.updateTime.minute.toString().padLeft(2, '0')}";
 
         return Scaffold(
@@ -360,22 +480,25 @@ class _WeatherScreenState extends State<WeatherScreen>
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('현재 바다 상황',
-                    style:
-                        TextStyle(fontWeight: FontWeight.w800, fontSize: 19)),
+                const Text(
+                  '현재 바다 상황',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19),
+                ),
                 const SizedBox(height: 2),
-                Text('업데이트: $timeStr',
-                    style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black54,
-                        fontWeight: FontWeight.w500)),
+                Text(
+                  '업데이트: $timeStr',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
             backgroundColor: Colors.white,
             foregroundColor: Colors.black87,
             elevation: 0,
             actions: [
-              // ✅ 리로드 버튼: 로딩 중엔 스피너, 완료 시 아이콘으로 전환
               IconButton(
                 icon: _isRefreshing
                     ? const SizedBox(
@@ -386,8 +509,10 @@ class _WeatherScreenState extends State<WeatherScreen>
                           color: Colors.blueAccent,
                         ),
                       )
-                    : const Icon(Icons.refresh_rounded,
-                        color: Colors.blueAccent),
+                    : const Icon(
+                        Icons.refresh_rounded,
+                        color: Colors.blueAccent,
+                      ),
                 tooltip: '날씨/수온 새로고침',
                 onPressed: _isRefreshing ? null : _handleButtonRefresh,
               ),
@@ -415,7 +540,9 @@ class _WeatherScreenState extends State<WeatherScreen>
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 24.0, vertical: 20.0),
+                      horizontal: 24.0,
+                      vertical: 20.0,
+                    ),
                     child: AnimatedOpacity(
                       opacity: (isLoading || _isRefreshing) ? 0.4 : 1.0,
                       duration: const Duration(milliseconds: 300),
@@ -426,67 +553,99 @@ class _WeatherScreenState extends State<WeatherScreen>
                             Container(
                               margin: const EdgeInsets.only(bottom: 16),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 12),
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
-                                  color: Colors.orange.shade50,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color: Colors.orange.shade200)),
+                                color: Colors.orange.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.orange.shade200,
+                                ),
+                              ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.wifi_off_rounded,
-                                      color: Colors.orange.shade700, size: 20),
+                                  Icon(
+                                    Icons.wifi_off_rounded,
+                                    color: Colors.orange.shade700,
+                                    size: 20,
+                                  ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       "인터넷 연결이 끊겨 로컬 데이터를 표시합니다.",
                                       style: TextStyle(
-                                          color: Colors.orange.shade900,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600),
+                                        color: Colors.orange.shade900,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
                                     ),
                                   ),
                                 ],
                               ),
                             ),
                           _buildRecommendedFishSection(
-                              data.recommendedFish, data.updateTime.month),
+                            data.recommendedFish,
+                            data.updateTime.month,
+                          ),
                           const SizedBox(height: 28),
                           Row(
                             children: const [
-                              Icon(Icons.location_on,
-                                  color: Colors.redAccent, size: 20),
+                              Icon(
+                                Icons.location_on,
+                                color: Colors.redAccent,
+                                size: 20,
+                              ),
                               SizedBox(width: 6),
-                              Text('실시간 해양 데이터 (부산 앞바다)',
-                                  style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.black87)),
+                              Text(
+                                '실시간 해양 데이터 (부산 앞바다)',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black87,
+                                ),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 16),
                           Row(
                             children: [
-                              _buildInfoCard("기온", data.temperature, null,
-                                  Icons.thermostat, const Color(0xFFFF8A65)),
+                              _buildInfoCard(
+                                "기온",
+                                data.temperature,
+                                null,
+                                Icons.thermostat,
+                                const Color(0xFFFF8A65),
+                              ),
                               const SizedBox(width: 14),
                               _buildInfoCard(
-                                  "풍속",
-                                  data.windSpeed,
-                                  data.windDirection,
-                                  Icons.air,
-                                  const Color(0xFF4DB6AC),
-                                  windAngle: data.windAngle),
+                                "풍속",
+                                data.windSpeed,
+                                data.windDirection,
+                                Icons.air,
+                                const Color(0xFF4DB6AC),
+                                windAngle: data.windAngle,
+                              ),
                             ],
                           ),
                           const SizedBox(height: 14),
                           Row(
                             children: [
-                              _buildInfoCard("파고", data.waveHeight, null,
-                                  Icons.waves, const Color(0xFF7986CB)),
+                              _buildInfoCard(
+                                "파고",
+                                data.waveHeight,
+                                null,
+                                Icons.waves,
+                                const Color(0xFF7986CB),
+                              ),
                               const SizedBox(width: 14),
-                              _buildInfoCard("수온", data.waterTemp, null,
-                                  Icons.water_drop, const Color(0xFF64B5F6)),
+                              _buildInfoCard(
+                                "수온",
+                                data.waterTemp,
+                                null,
+                                Icons.water_drop,
+                                const Color(0xFF64B5F6),
+                              ),
                             ],
                           ),
                           const SizedBox(height: 40),
@@ -496,6 +655,7 @@ class _WeatherScreenState extends State<WeatherScreen>
                   ),
                 ),
               ),
+
               if (_isDangerZone && !_isDismissedManually)
                 GestureDetector(
                   onTap: () => setState(() => _isDismissedManually = true),
@@ -507,36 +667,47 @@ class _WeatherScreenState extends State<WeatherScreen>
                         child: Container(
                           margin: const EdgeInsets.symmetric(horizontal: 32),
                           padding: const EdgeInsets.symmetric(
-                              vertical: 30, horizontal: 24),
+                            vertical: 30,
+                            horizontal: 24,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.red.withOpacity(0.9),
                             borderRadius: BorderRadius.circular(24),
                             boxShadow: [
                               BoxShadow(
-                                  color: Colors.red.withOpacity(0.6),
-                                  blurRadius: 30,
-                                  spreadRadius: 5)
+                                color: Colors.red.withOpacity(0.6),
+                                blurRadius: 30,
+                                spreadRadius: 5,
+                              ),
                             ],
                           ),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.warning_amber_rounded,
-                                  color: Colors.white, size: 60),
+                              const Icon(
+                                Icons.warning_amber_rounded,
+                                color: Colors.white,
+                                size: 60,
+                              ),
                               const SizedBox(height: 16),
                               Text(
                                 "위험!\n현재 [$_currentDangerPlace]\n추락 위험 지역입니다!",
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w800,
-                                    height: 1.4),
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.4,
+                                ),
                               ),
                               const SizedBox(height: 16),
-                              const Text("(화면을 터치하면 닫힙니다)",
-                                  style: TextStyle(
-                                      color: Colors.white70, fontSize: 12)),
+                              const Text(
+                                "(화면을 터치하면 닫힙니다)",
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -552,28 +723,37 @@ class _WeatherScreenState extends State<WeatherScreen>
   }
 
   Widget _buildRecommendedFishSection(String text, int month) {
-    List<TextSpan> spans = [];
-    final RegExp exp = RegExp(r'\*\*(.*?)\*\*');
+    final List<TextSpan> spans = [];
+    final exp = RegExp(r'\*\*(.*?)\*\*');
     int start = 0;
-    for (final Match m in exp.allMatches(text)) {
-      if (m.start > start)
+
+    for (final m in exp.allMatches(text)) {
+      if (m.start > start) {
         spans.add(TextSpan(text: text.substring(start, m.start)));
-      spans.add(TextSpan(
+      }
+      spans.add(
+        TextSpan(
           text: m.group(1),
           style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              color: Color(0xFFFFD54F),
-              fontSize: 16)));
+            fontWeight: FontWeight.w900,
+            color: Color(0xFFFFD54F),
+            fontSize: 16,
+          ),
+        ),
+      );
       start = m.end;
     }
-    if (start < text.length) spans.add(TextSpan(text: text.substring(start)));
+    if (start < text.length) {
+      spans.add(TextSpan(text: text.substring(start)));
+    }
 
     String seasonIcon = "❄️";
     if (month >= 3 && month <= 5)
       seasonIcon = "🌸";
     else if (month >= 6 && month <= 8)
       seasonIcon = "☀️";
-    else if (month >= 9 && month <= 11) seasonIcon = "🍁";
+    else if (month >= 9 && month <= 11)
+      seasonIcon = "🍁";
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -582,21 +762,20 @@ class _WeatherScreenState extends State<WeatherScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4))
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Row(
         children: [
           AnimatedBuilder(
             animation: _floatController,
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(0, -6 * _floatController.value),
-                child: child,
-              );
-            },
+            builder: (context, child) => Transform.translate(
+              offset: Offset(0, -6 * _floatController.value),
+              child: child,
+            ),
             child: Text(seasonIcon, style: const TextStyle(fontSize: 40)),
           ),
           const SizedBox(width: 18),
@@ -604,21 +783,26 @@ class _WeatherScreenState extends State<WeatherScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("$month월 바다 추천",
-                    style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600)),
+                Text(
+                  "$month월 바다 추천",
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 6),
                 RichText(
-                    text: TextSpan(
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                            height: 1.4,
-                            fontFamily: 'Pretendard'),
-                        children: spans)),
+                  text: TextSpan(
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
+                    ),
+                    children: spans,
+                  ),
+                ),
               ],
             ),
           ),
@@ -628,8 +812,13 @@ class _WeatherScreenState extends State<WeatherScreen>
   }
 
   Widget _buildInfoCard(
-      String title, String value, String? subtitle, IconData icon, Color color,
-      {double windAngle = 0.0}) {
+    String title,
+    String value,
+    String? subtitle,
+    IconData icon,
+    Color color, {
+    double windAngle = 0.0,
+  }) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
@@ -638,10 +827,11 @@ class _WeatherScreenState extends State<WeatherScreen>
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 10,
-                spreadRadius: 2,
-                offset: const Offset(0, 4))
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              spreadRadius: 2,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
         child: Column(
@@ -649,33 +839,48 @@ class _WeatherScreenState extends State<WeatherScreen>
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                  color: color.withOpacity(0.1), shape: BoxShape.circle),
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
               child: title == "풍속"
                   ? Transform.rotate(
                       angle: (windAngle + 180) * 3.1415926535 / 180,
-                      child: Icon(Icons.navigation_rounded,
-                          color: color, size: 24))
+                      child: Icon(
+                        Icons.navigation_rounded,
+                        color: color,
+                        size: 24,
+                      ),
+                    )
                   : Icon(icon, color: color, size: 24),
             ),
             const SizedBox(height: 12),
-            Text(title,
-                style: const TextStyle(
-                    color: Color(0xFF868E96),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600)),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Color(0xFF868E96),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             const SizedBox(height: 6),
-            Text(value,
-                style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18,
-                    color: Color(0xFF212529))),
+            Text(
+              value,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                color: Color(0xFF212529),
+              ),
+            ),
             if (subtitle != null) ...[
               const SizedBox(height: 4),
-              Text(subtitle,
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                      color: color)),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  color: color,
+                ),
+              ),
             ],
           ],
         ),
