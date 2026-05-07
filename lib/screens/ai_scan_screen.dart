@@ -284,7 +284,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
           Positioned.fill(child: ColorFiltered(colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.5), BlendMode.srcOut), child: Stack(children: [Container(color: Colors.transparent), Align(alignment: Alignment.center, child: Container(width: 280, height: 280, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(30))))]))),
           Align(alignment: Alignment.center, child: Container(width: 280, height: 280, decoration: BoxDecoration(border: Border.all(color: const Color(0xFF007AFF), width: 3), borderRadius: BorderRadius.circular(30)))),
           
-          Positioned(top: 60, left: 0, right: 0, child: Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10), decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(20)), child: const Text("🐟 가이드라인 안에 물고기를 맞추세요", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))))),
+          Positioned(top: 60, left: 0, right: 0, child: Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10), decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(20)), child: const Text("가이드라인 안에 물고기를 맞추세요", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))))),
 
           Positioned(
             top: 55, right: 15,

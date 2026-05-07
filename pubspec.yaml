@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.6
+  flutter_launcher_icons: ^0.14.1
   
   # [조장님 담당] AI 모델 및 카메라 계측 관련 패키지
   tflite_flutter: ^0.12.1
@@ -30,6 +31,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  flutter_native_splash: ^2.4.0   # ✅ 추가: 스플래시 배경 제거용
 
 flutter:
   uses-material-design: true
@@ -37,4 +39,23 @@ flutter:
   assets:
     - assets/fish_model_float16.tflite
     - assets/labels.txt
-    - assets/fish_rules.json  
+    - assets/fish_rules.json
+    - assets/ic_launcher_foreground.png
+    - assets/ic_launcher_background.png
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/app_icon.png"          # iOS용
+  remove_alpha_ios: true
+  adaptive_icon_background: "assets/ic_launcher_background.png"   # 파란 배경
+  adaptive_icon_foreground: "assets/ic_launcher_foreground.png"   # 아이콘
+
+flutter_native_splash:
+  color: "#ffffff"                        # 배경 흰색
+  image: assets/splash_icon.png          # 둥근 아이콘 이미지
+  fullscreen: true
+  android_12:
+    color: "#ffffff"
+    image: assets/splash_icon.png
+    icon_background_color: "#ffffff"
