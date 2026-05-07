@@ -36,23 +36,18 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
   final List<Map<String, String>> fishData = [
     {
       "name": "감성돔",
-      "tackleUrl": "https://www.coupang.com/np/search?q=바다+찌낚시+채비세트"
     },
     {
       "name": "광어",
-      "tackleUrl": "https://www.coupang.com/np/search?q=광어+프리리그+채비"
     },
     {
       "name": "우럭",
-      "tackleUrl": "https://www.coupang.com/np/search?q=지그헤드+웜+세트"
     },
     {
       "name": "쥐노래미",
-      "tackleUrl": "https://www.coupang.com/np/search?q=지그헤드+웜+세트"
     },
     {
       "name": "참돔",
-      "tackleUrl": "https://www.coupang.com/np/search?q=쇼어+타이라바"
     },
   ];
 
@@ -280,16 +275,18 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
           const Divider(),
           const SizedBox(height: 12),
           const Text(
-            "어종별 수집 현황 및 추천 채비",
+            "어종별 수집 현황",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
 
+          // 2. 어종별 리스트 섹션
           ...fishData.map((fish) {
             final String name = fish['name'] ?? 'Unknown';
             final List<String> imagePathList = collectionMap[name] ?? [];
             final bool isCollected = imagePathList.isNotEmpty;
 
+            // 모든 물고기 카드는 동일한 여백(bottom: 16)으로 생성합니다.
             return Card(
               margin: const EdgeInsets.only(bottom: 16),
               clipBehavior: Clip.antiAlias,
@@ -306,10 +303,9 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
                         itemCount: imagePathList.length,
                         itemBuilder: (context, imgIndex) {
                           final path = imagePathList[imgIndex];
-                          // 💡 [추가됨] 사진을 터치 가능하도록 GestureDetector로 감싸기
+                          // 사진 터치 시 팝업 띄우기
                           return GestureDetector(
                             onTap: () {
-                              // 경로에서 날짜 추출 후 팝업 띄우기!
                               String dateStr = _getFormattedDateFromPath(path);
                               _showFishDetailPopup(context, name, path, dateStr);
                             },
@@ -351,20 +347,15 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(isCollected ? "수집 완료 (${imagePathList.length})" : "미수집"),
-                    trailing: ElevatedButton.icon(
-                      onPressed: () => _launchURL(fish['tackleUrl']),
-                      icon: const Icon(Icons.shopping_cart, size: 16),
-                      label: const Text("채비 구매"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
                   ),
                 ],
               ),
             );
-          }),
+          }), // 👈 map 함수 종료
+
+          // 💡 [핵심 추가] 리스트 맨 마지막(참돔 아래)에 빈 공간을 추가하여 스크롤을 더 내릴 수 있게 만듭니다.
+          const SizedBox(height: 120), // 이 숫자를 조절하여 스크롤 여유 공간을 맞추세요!
+
         ],
       ),
     );
