@@ -1,10 +1,14 @@
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:image/image.dart' as img;
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import '../services/ai_services.dart';
 import '../services/regulation_service.dart';
 import 'measurement_screen.dart';
-import 'encyclopedia_screen.dart'; 
+import 'encyclopedia_screen.dart';
 
 class AiScanScreen extends StatefulWidget {
   const AiScanScreen({super.key});
@@ -20,6 +24,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
 
   final AiService _aiService = AiService();
   final RegulationService _regulationService = RegulationService();
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -28,22 +33,32 @@ class _AiScanScreenState extends State<AiScanScreen> {
   }
 
   Future<void> _initAllServices() async {
-    await _aiService.loadModel(); // MobileNetV3 로드
+    await _aiService.loadModel();
     await _regulationService.loadRegulations();
     try {
       final cameras = await availableCameras();
       _cameraController = CameraController(cameras.first, ResolutionPreset.high, enableAudio: false);
       await _cameraController!.initialize();
       if (mounted) setState(() => _isCameraInitialized = true);
-    } catch (e) { print("카메라 에러: $e"); }
+    } catch (e) {
+      print("카메라 에러: $e");
+    }
   }
 
   @override
-  void dispose() { _cameraController?.dispose(); super.dispose(); }
+  void dispose() {
+    _cameraController?.dispose();
+    super.dispose();
+  }
 
   // 📅 금어기 판단 로직
   bool _checkIfProhibited(String? range) {
-    if (range == null || range.contains("없음")) return false;
+    if (range == null ||
+        range.contains("없음") ||
+        range.contains("확인 필요") ||
+        range.contains("해당 없음")) {
+      return false;
+    }
     try {
       final now = DateTime.now();
       final currentMd = now.month * 100 + now.day;
@@ -52,23 +67,101 @@ class _AiScanScreenState extends State<AiScanScreen> {
         final p = t.trim().split(RegExp(r'월|일')).where((s) => s.isNotEmpty).toList();
         return int.parse(p[0]) * 100 + int.parse(p[1]);
       }
-      final s = pm(dates[0]); final e = pm(dates[1]);
+      final s = pm(dates[0]);
+      final e = pm(dates[1]);
       return s <= e ? (currentMd >= s && currentMd <= e) : (currentMd >= s || currentMd <= e);
-    } catch (e) { return false; }
+    } catch (e) {
+      return false;
+    }
   }
 
-  // 📸 사진 촬영 및 분석
+  // ── [수정] 카메라 촬영 + 가이드라인 영역 크롭
   Future<void> _takeAndAnalyzePhoto() async {
-    if (_isAnalyzing) return;
-    setState(() => _isAnalyzing = true);
-    try {
-      final photo = await _cameraController!.takePicture();
-      final result = await _aiService.predict(File(photo.path));
-      _showResultBottomSheet(result, File(photo.path));
-    } finally { setState(() => _isAnalyzing = false); }
+  if (_isAnalyzing) return;
+  setState(() => _isAnalyzing = true);
+  try {
+    final photo = await _cameraController!.takePicture();
+
+    // 가이드라인 영역만 잘라서 모델에 넘김 (멀리 찍어도 물고기가 프레임을 채우게 함)
+    final croppedFile = await _cropToGuideline(File(photo.path));
+
+    final result = await _aiService.predict(croppedFile);
+    if (mounted) _showResultBottomSheet(result, croppedFile);
+  } catch (e) {
+    print("촬영/분석 에러: $e");
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('분석 중 오류가 발생했습니다. 다시 시도해주세요.')),
+      );
+    }
+  } finally {
+    if (mounted) setState(() => _isAnalyzing = false);
+  }
   }
 
-  // 🎨 3장 그림 스타일 튜토리얼 팝업
+  // ── [추가] 가이드라인 영역만 잘라내는 함수
+  /// 카메라로 찍은 원본 사진에서 화면의 파란 가이드라인 사각형에 해당하는
+  /// 부분(짧은 변 기준 정중앙 정사각형)만 잘라내 임시 파일로 저장.
+  Future<File> _cropToGuideline(File originalPhoto) async {
+  final bytes = await originalPhoto.readAsBytes();
+  final decoded = img.decodeImage(bytes);
+  if (decoded == null) return originalPhoto;
+
+  final oriented = img.bakeOrientation(decoded);
+
+  // 화면의 가이드라인은 280×280px이고, 일반적인 폰 화면 폭이 ~390px이므로
+  // 화면 폭의 약 72%를 차지함. 사진에서도 짧은 변의 ~72%만 자르면 됨.
+  // (CameraPreview가 BoxFit.cover로 화면을 채우는 표준 케이스 기준)
+  final shortSide = min(oriented.width, oriented.height);
+  final cropSize = (shortSide * 0.72).toInt();  // 0.95 → 0.72로 더 타이트하게
+  
+  final cx = (oriented.width  - cropSize) ~/ 2;
+  final cy = (oriented.height - cropSize) ~/ 2;
+
+  final cropped = img.copyCrop(
+    oriented,
+    x: cx, y: cy,
+    width: cropSize, height: cropSize,
+  );
+
+  final tmpDir = await getTemporaryDirectory();
+  final tmpPath = '${tmpDir.path}/cropped_${DateTime.now().millisecondsSinceEpoch}.jpg';
+  final tmpFile = File(tmpPath);
+  await tmpFile.writeAsBytes(img.encodeJpg(cropped, quality: 95));
+
+  return tmpFile;
+  }
+
+  // ── [추가] 갤러리에서 사진 선택 후 분석 (디버그/검증 모드)
+  /// 갤러리에서 이미 잘 찍힌 사진을 골라 분석.
+  /// 크롭은 적용하지 않음 — 카메라 보정과 별개로 모델 자체 정확도를 검증할 때 사용.
+  Future<void> _pickFromGalleryAndAnalyze() async {
+    if (_isAnalyzing) return;
+
+    try {
+      final XFile? picked = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 2048,
+      );
+      if (picked == null) return;
+
+      setState(() => _isAnalyzing = true);
+
+      final result = await _aiService.predict(File(picked.path));
+      if (mounted) _showResultBottomSheet(result, File(picked.path));
+    } catch (e) {
+      print("갤러리 분석 에러: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('이미지를 분석할 수 없습니다.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isAnalyzing = false);
+    }
+  }
+
+  // 🎨 튜토리얼 팝업 (기존 그대로)
   void _showTutorialDialog() {
     showDialog(
       context: context,
@@ -80,19 +173,27 @@ class _AiScanScreenState extends State<AiScanScreen> {
           children: [
             Container(
               padding: const EdgeInsets.symmetric(vertical: 15),
-              decoration: const BoxDecoration(color: Colors.blueAccent, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+              decoration: const BoxDecoration(
+                color: Colors.blueAccent,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
               width: double.infinity,
-              child: const Text("📏 스마트 계측 가이드", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+              child: const Text("📏 스마트 계측 가이드",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
             ),
             Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  _buildIllustrationStep("1", "👟 신발을 옆에 두기", "물고기 옆에 신발을 나란히 놓으세요.", Colors.orange.shade100, Icons.do_not_step),
+                  _buildIllustrationStep("1", "👟 신발을 옆에 두기", "물고기 옆에 신발을 나란히 놓으세요.",
+                      Colors.orange.shade100, Icons.do_not_step),
                   const Divider(height: 30),
-                  _buildIllustrationStep("2", "📸 한 번에 촬영하기", "물고기와 신발이 다 보이게 찍으세요.", Colors.blue.shade100, Icons.camera_alt),
+                  _buildIllustrationStep("2", "📸 한 번에 촬영하기", "물고기와 신발이 다 보이게 찍으세요.",
+                      Colors.blue.shade100, Icons.camera_alt),
                   const Divider(height: 30),
-                  _buildIllustrationStep("3", "📏 선 긋고 측정 끝!", "결과창에서 선만 그으면 cm가 나옵니다.", Colors.green.shade100, Icons.edit_note),
+                  _buildIllustrationStep("3", "📏 선 긋고 측정 끝!", "결과창에서 선만 그으면 cm가 나옵니다.",
+                      Colors.green.shade100, Icons.edit_note),
                 ],
               ),
             ),
@@ -101,7 +202,8 @@ class _AiScanScreenState extends State<AiScanScreen> {
               height: 50,
               child: TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text("이해했어요!", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                child: const Text("이해했어요!",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ),
             ),
           ],
@@ -114,7 +216,8 @@ class _AiScanScreenState extends State<AiScanScreen> {
     return Row(
       children: [
         Container(
-          width: 50, height: 50,
+          width: 50,
+          height: 50,
           decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(12)),
           child: Icon(icon, color: Colors.black54),
         ),
@@ -132,180 +235,622 @@ class _AiScanScreenState extends State<AiScanScreen> {
     );
   }
 
-  // ✨ 결과 바텀 시트 (도감 연동 버튼 추가됨!)
-  void _showResultBottomSheet(Map<String, dynamic> result, File file) {
-    double confidence = result['confidence']; 
-    String label = result['label'];
-    bool isSuccess = label != '알 수 없음' && confidence >= 0.6;
-    var reg = _regulationService.getRegulationInfo(label);
-    bool isPro = _checkIfProhibited(reg?["금어기"]);
+  // ✨ 결과 바텀 시트 (Top-3 + 안전 경고 + 면책)
+  void _showResultBottomSheet(AiPredictionResult result, File file) {
+    final top = result.top;
+    final isBackground = top.englishLabel == "5_background";
+    final showFishInfo = result.isReliable && !isBackground;
+
+    final reg = showFishInfo ? _regulationService.getRegulationInfo(top.koreanName) : null;
+    final isPro = reg != null && _checkIfProhibited(reg["금어기"]);
+    final isIncomplete = reg != null && _regulationService.isRegulationIncomplete(reg);
 
     showModalBottomSheet(
-      context: context, isScrollControlled: true, backgroundColor: Colors.transparent,
-      builder: (sc) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 15, 24, 20),
-        decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
-            const SizedBox(height: 20),
-            ClipRRect(borderRadius: BorderRadius.circular(15), child: Image.file(file, height: 100, width: 100, fit: BoxFit.cover)),
-            const SizedBox(height: 15),
-            Text(isSuccess ? "🐟 $label" : "🚨 어종 인식 실패", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: isSuccess ? Colors.black87 : Colors.redAccent)),
-            const SizedBox(height: 20),
-            
-            // ✨ [여기를 추가해 주세요!] 인식 실패 시 나타나는 안내 문구
-            if (!isSuccess)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50, 
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sc) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        maxChildSize: 0.95,
+        minChildSize: 0.4,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          padding: const EdgeInsets.fromLTRB(24, 15, 24, 20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+          ),
+          child: ListView(
+            controller: scrollController,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Center(
+                child: ClipRRect(
                   borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.red.shade100)
+                  child: Image.file(file, height: 100, width: 100, fit: BoxFit.cover),
                 ),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("💡 다시 한 번 찍어주세요!", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
-                    SizedBox(height: 8),
-                    Text("• 물고기가 파란색 가이드라인 중앙에 오도록 맞춰주세요.\n• 너무 멀거나 어두우면 AI가 헷갈려 할 수 있어요.\n• 물고기의 측면(옆면)이 잘 보이게 찍어주세요.", 
-                      style: TextStyle(fontSize: 13, color: Colors.black87, height: 1.4)
+              ),
+              const SizedBox(height: 15),
+
+              // ─── 결과 헤더
+              Center(
+                child: Text(
+                  showFishInfo ? "🐟 ${top.koreanName}" : "🚨 어종 인식 실패",
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: showFishInfo ? Colors.black87 : Colors.redAccent,
+                  ),
+                ),
+              ),
+              if (showFishInfo)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      "AI 신뢰도 ${(top.confidence * 100).toStringAsFixed(0)}%",
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            if (isSuccess && reg != null)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isPro ? Colors.red.shade50 : Colors.blue.shade50, 
-                  borderRadius: BorderRadius.circular(15), 
-                  border: Border.all(color: isPro ? Colors.red.shade100 : Colors.blue.shade100)
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Icon(isPro ? Icons.warning : Icons.info, color: isPro ? Colors.red : Colors.blue),
-                      const SizedBox(width: 8),
-                      Text(isPro ? "금어기 (방생 필수)" : "보호 규정 안내", style: TextStyle(fontWeight: FontWeight.bold, color: isPro ? Colors.red : Colors.blue)),
-                      const Spacer(),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(context, MaterialPageRoute(builder: (context) => MeasurementScreen(imageFile: file, label: label)));
-                        }, 
-                        icon: const Icon(Icons.straighten, size: 14, color: Colors.blueAccent),
-                        label: const Text("신발로 크기 측정", style: TextStyle(fontSize: 12, color: Colors.blueAccent, fontWeight: FontWeight.bold)),
-                        style: ElevatedButton.styleFrom(backgroundColor: Colors.blue.shade50, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Colors.blue.shade200))),
-                      ),
-                    ]),
-                    const Divider(height: 20),
-                    Text("• 금어기: ${reg["금어기"]}"),
-                    Text("• 금지체장: ${reg["금지체장"]}"),
-                    if (reg["비고"] != null && reg["비고"].toString().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Text("${reg["비고"]}", style: TextStyle(fontSize: 11, color: Colors.grey[600], fontStyle: FontStyle.italic)),
-                      ),
-                  ],
-                ),
-              ),
-            
-            const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
-            // ✨ [새로 추가된 기능] 인식 성공 시 '내 도감에 저장' 버튼 표시
-            if (isSuccess)
+              // ─── 경고 메시지 (있는 경우)
+              if (result.warningMessage != null) _buildWarningBox(result.warningMessage!),
+
+              // ─── 위험 어종 경고 (독침/독성)
+              if (result.dangerMessage != null) ...[
+                const SizedBox(height: 10),
+                _buildDangerBox(result.dangerMessage!),
+              ],
+
+              // ─── 인식 실패 시 촬영 가이드
+              if (!showFishInfo) _buildRetryGuide(),
+
+              // ─── Top-3 후보 표시 (성공 시에만)
+              if (showFishInfo) ...[
+                const SizedBox(height: 12),
+                _buildTopCandidates(result.topCandidates),
+              ],
+
+              // ─── 규정 정보 카드
+              if (showFishInfo && reg != null) ...[
+                const SizedBox(height: 12),
+                _buildRegulationCard(reg, isPro, isIncomplete, top.koreanName, file),
+              ],
+
+              // ─── 규정 정보 없음
+              if (showFishInfo && reg == null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: Colors.amber.shade200),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Icon(Icons.info_outline, color: Colors.amber.shade700, size: 20),
+                        const SizedBox(width: 8),
+                        const Text("규정 정보 미등록",
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                      ]),
+                      const SizedBox(height: 8),
+                      Text(
+                        "'${top.koreanName}'의 규정 정보가 앱에 등록되어 있지 않습니다. 해양수산부 또는 지역 수협에 문의해주세요.",
+                        style: const TextStyle(fontSize: 13, height: 1.4),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 20),
+
+              // ─── 도감 저장 버튼 (신뢰 가능한 경우만)
+              if (showFishInfo)
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(sc);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => EncyclopediaScreen(
+                            capturedImage: file,
+                            targetFish: top.koreanName,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.book, color: Colors.white),
+                    label: const Text("내 도감에 저장",
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.teal,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              if (showFishInfo) const SizedBox(height: 10),
+
+              // ─── 닫기 버튼
               SizedBox(
-                width: double.infinity, 
-                height: 50, 
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(sc); // 바텀시트 먼저 닫기
-                    // 🚀 도감 화면으로 사진과 이름 넘겨주기!
-                    Navigator.push(
-                      context, 
-                      MaterialPageRoute(
-                        builder: (context) => EncyclopediaScreen(
-                          capturedImage: file, 
-                          targetFish: label
-                        )
-                      )
-                    );
-                  }, 
-                  icon: const Icon(Icons.book, color: Colors.white),
-                  label: const Text("내 도감에 저장 및 확인", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(sc),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal, // 친환경적인 느낌의 색상
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-                  )
-                )
+                    backgroundColor: Colors.grey.shade200,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text("닫기",
+                      style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                ),
               ),
-            
-            if (isSuccess) const SizedBox(height: 10),
+              const SizedBox(height: 12),
 
-            // 기존 닫기 버튼 (디자인을 회색으로 낮춰서 도감 버튼이 돋보이게 함)
-            SizedBox(
-              width: double.infinity, 
-              height: 50, 
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(sc), 
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey.shade200, 
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
-                ), 
-                child: const Text("닫기", style: TextStyle(color: Colors.black87, fontWeight: FontWeight.bold))
-              )
-            ),
-            
-            TextButton(
-              onPressed: () {
-                Navigator.pop(sc);
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('오답 신고가 접수되었습니다. 더 나은 결과를 보답하도록 노력하겠습니다.'), behavior: SnackBarBehavior.floating));
-              }, 
-              child: const Text("결과가 틀렸나요? (오답 신고)", style: TextStyle(color: Colors.grey, fontSize: 12, decoration: TextDecoration.underline))
-            ),
-          ],
+              // ─── 면책 문구 (항상 표시)
+              _buildDisclaimer(),
+
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(sc);
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('오답 신고가 접수되었습니다. 더 나은 결과로 보답하겠습니다.'),
+                    behavior: SnackBarBehavior.floating,
+                  ));
+                },
+                child: const Text(
+                  "결과가 틀렸나요? (오답 신고)",
+                  style: TextStyle(color: Colors.grey, fontSize: 12, decoration: TextDecoration.underline),
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildWarningBox(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(message,
+                style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w500)),
+          ),
+        ],
+      ),
+    );
+  }
+  Widget _buildDangerBox(String message) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.shade400, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.dangerous, color: Colors.red.shade700, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                "⚠️ 위험 어종 주의",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red.shade700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            style: const TextStyle(fontSize: 13, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRetryGuide() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(top: 12),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.red.shade100),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("💡 다시 촬영해 주세요",
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+          SizedBox(height: 8),
+          Text(
+            "• 물고기가 가이드라인 중앙에 오도록 맞춰주세요.\n• 물고기의 측면(옆면)이 잘 보이게 찍어주세요.\n• 너무 멀거나 어두우면 인식이 어려워요.\n• 등지느러미와 꼬리지느러미가 보이도록 찍으면 좋습니다.",
+            style: TextStyle(fontSize: 13, color: Colors.black87, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopCandidates(List<FishCandidate> candidates) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.list_alt, size: 18, color: Colors.grey.shade700),
+              const SizedBox(width: 6),
+              Text("AI 식별 후보 (정확하지 않을 수 있어요)",
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey.shade700)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...candidates.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final c = entry.value;
+            final pct = (c.confidence * 100).toStringAsFixed(1);
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: idx == 0 ? Colors.teal : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text("${idx + 1}",
+                          style: TextStyle(
+                            color: idx == 0 ? Colors.white : Colors.black54,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          )),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(c.koreanName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: idx == 0 ? FontWeight.bold : FontWeight.normal,
+                        )),
+                  ),
+                  Text("$pct%",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: idx == 0 ? Colors.teal : Colors.grey.shade600,
+                        fontWeight: idx == 0 ? FontWeight.bold : FontWeight.normal,
+                      )),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegulationCard(
+      Map<String, dynamic> reg, bool isPro, bool isIncomplete, String koreanName, File file) {
+    final Color bgColor;
+    final Color borderColor;
+    final IconData icon;
+    final String title;
+    final Color accentColor;
+
+    if (isPro) {
+      bgColor = Colors.red.shade50;
+      borderColor = Colors.red.shade200;
+      icon = Icons.warning;
+      title = "⚠️ 금어기 (방생 권장)";
+      accentColor = Colors.red;
+    } else if (isIncomplete) {
+      bgColor = Colors.amber.shade50;
+      borderColor = Colors.amber.shade200;
+      icon = Icons.info_outline;
+      title = "정보 일부 누락";
+      accentColor = Colors.amber.shade800;
+    } else {
+      bgColor = Colors.blue.shade50;
+      borderColor = Colors.blue.shade200;
+      icon = Icons.info;
+      title = "보호 규정 안내";
+      accentColor = Colors.blue;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, color: accentColor),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(title,
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, color: accentColor, fontSize: 15)),
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        MeasurementScreen(imageFile: file, label: koreanName),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.straighten, size: 14, color: Colors.blueAccent),
+              label: const Text("크기 측정",
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blueAccent,
+                      fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade50,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  side: BorderSide(color: Colors.blue.shade200),
+                ),
+              ),
+            ),
+          ]),
+          const Divider(height: 20),
+          Text("• 금어기: ${reg["금어기"]}", style: const TextStyle(fontSize: 14)),
+          const SizedBox(height: 4),
+          Text("• 금지체장: ${reg["금지체장"]}", style: const TextStyle(fontSize: 14)),
+          if (reg["비고"] != null && reg["비고"].toString().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8.0),
+              child: Text("${reg["비고"]}",
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[700],
+                      fontStyle: FontStyle.italic,
+                      height: 1.4)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDisclaimer() {
+    final disclaimer = _regulationService.disclaimer;
+    final version = _regulationService.version;
+    final lastUpdated = _regulationService.lastUpdated;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.gavel, size: 14, color: Colors.grey.shade700),
+              const SizedBox(width: 6),
+              Text("법적 안내", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            disclaimer.isNotEmpty
+                ? disclaimer
+                : "본 정보는 참고용입니다. 최종 책임은 사용자에게 있습니다.",
+            style: TextStyle(fontSize: 10, color: Colors.grey.shade700, height: 1.5),
+          ),
+          if (version.isNotEmpty || lastUpdated.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                "규정 데이터 v$version (갱신: $lastUpdated)",
+                style: TextStyle(fontSize: 9, color: Colors.grey.shade500),
+              ),
+            ),
+        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_isCameraInitialized) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (!_isCameraInitialized) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
           Positioned.fill(child: CameraPreview(_cameraController!)),
-          Positioned.fill(child: ColorFiltered(colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.5), BlendMode.srcOut), child: Stack(children: [Container(color: Colors.transparent), Align(alignment: Alignment.center, child: Container(width: 280, height: 280, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(30))))]))),
-          Align(alignment: Alignment.center, child: Container(width: 280, height: 280, decoration: BoxDecoration(border: Border.all(color: const Color(0xFF007AFF), width: 3), borderRadius: BorderRadius.circular(30)))),
-          
-          Positioned(top: 60, left: 0, right: 0, child: Center(child: Container(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10), decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), borderRadius: BorderRadius.circular(20)), child: const Text("가이드라인 안에 물고기를 맞추세요", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))))),
-
+          Positioned.fill(
+            child: ColorFiltered(
+              colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.5), BlendMode.srcOut),
+              child: Stack(children: [
+                Container(color: Colors.transparent),
+                Align(
+                  alignment: Alignment.center,
+                  child: Container(
+                    width: 280,
+                    height: 280,
+                    decoration: BoxDecoration(
+                      color: Colors.black,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+          Align(
+            alignment: Alignment.center,
+            child: Container(
+              width: 280,
+              height: 280,
+              decoration: BoxDecoration(
+                border: Border.all(color: const Color(0xFF007AFF), width: 3),
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+          ),
           Positioned(
-            top: 55, right: 15,
+            top: 60,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text("가이드라인 안에 물고기를 맞추세요",
+                    style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 55,
+            right: 15,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 GestureDetector(
                   onTap: _showTutorialDialog,
-                  child: Container(padding: const EdgeInsets.all(8), decoration: const BoxDecoration(color: Colors.blueAccent, shape: BoxShape.circle), child: const Icon(Icons.help_outline, color: Colors.white, size: 28)),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: const BoxDecoration(color: Colors.blueAccent, shape: BoxShape.circle),
+                    child: const Icon(Icons.help_outline, color: Colors.white, size: 28),
+                  ),
                 ),
                 const SizedBox(height: 5),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: Colors.blueAccent, borderRadius: BorderRadius.circular(8)),
-                  child: const Text("길이 재는 법", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text("길이 재는 법",
+                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
           ),
-
-          Positioned(bottom: 100, left: 0, right: 0, child: Center(child: _isAnalyzing ? const CircularProgressIndicator() : GestureDetector(onTap: _takeAndAnalyzePhoto, child: Container(width: 70, height: 70, decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 4), color: Colors.white.withOpacity(0.2)), child: Center(child: Container(width: 55, height: 55, decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white))))))),
+          // ── [수정] 하단 촬영 버튼 + 갤러리 버튼 (좌측에 추가)
+          Positioned(
+            bottom: 100,
+            left: 0,
+            right: 0,
+            child: _isAnalyzing
+                ? const Center(child: CircularProgressIndicator())
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // ── 갤러리에서 선택 버튼 (디버그/검증용)
+                      GestureDetector(
+                        onTap: _pickFromGalleryAndAnalyze,
+                        child: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withOpacity(0.25),
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(
+                            Icons.photo_library_outlined,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 40),
+                      // ── 촬영 버튼 (기존 그대로)
+                      GestureDetector(
+                        onTap: _takeAndAnalyzePhoto,
+                        child: Container(
+                          width: 70,
+                          height: 70,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 4),
+                            color: Colors.white.withOpacity(0.2),
+                          ),
+                          child: Center(
+                            child: Container(
+                              width: 55,
+                              height: 55,
+                              decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // ── 우측 여백 균형용 (촬영 버튼이 화면 중앙에 오도록)
+                      const SizedBox(width: 40 + 50),
+                    ],
+                  ),
+          ),
         ],
       ),
     );
