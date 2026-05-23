@@ -13,6 +13,12 @@
 
     <!-- 4. 마이크 권한 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    
+     <!-- 갤러리 접근 (image_picker - Android 13+ 대응) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <application
         android:label="나우피싱"

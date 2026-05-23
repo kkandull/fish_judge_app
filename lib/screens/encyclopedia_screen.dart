@@ -1,179 +1,44 @@
 import 'dart:io';
-import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
-import 'package:image_picker/image_picker.dart';
-import 'package:share_plus/share_plus.dart'; // ← 추가: share_plus: ^9.0.0
+
 import 'share_card.dart';
-
-// ────────────────────────────────────────────────────────────────
-// 📦 pubspec.yaml 에 아래 패키지를 추가하세요:
-//
-//   geolocator: ^11.0.0
-//   http: ^1.2.1
-//   image_picker: ^1.1.2
-//   share_plus: ^9.0.0          ← 신규
-//
-// Android: AndroidManifest.xml 에 권한 추가
-//   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
-//   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
-//   <uses-permission android:name="android.permission.INTERNET"/>
-//
-// iOS: Info.plist 에 권한 추가
-//   NSLocationWhenInUseUsageDescription
-//   NSCameraUsageDescription
-//   NSPhotoLibraryUsageDescription
-// ────────────────────────────────────────────────────────────────
+import '../models/unified_catch_record.dart';
+import '../services/catch_record_repository.dart';
+import '../widgets/unified_catch_form.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📌 데이터 모델
+// 📌 필수 장비 데이터
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-/// 낚시 기록 1건 (이미지 경로 + 메타데이터 + 메모 + 크기/무게)
-class CatchRecord {
-  final String imagePath;
-  final DateTime catchTime;
-  final double? latitude;
-  final double? longitude;
-  final String? locationName;
-
-  // ── 신규 필드 ────────────────────────────────────────────────
-  final String? memo;          // 자유 메모 (포인트, 미끼, 날씨 등)
-  final double? lengthCm;      // 길이 (cm)
-  final double? weightG;       // 무게 (g)
-
-  CatchRecord({
-    required this.imagePath,
-    required this.catchTime,
-    this.latitude,
-    this.longitude,
-    this.locationName,
-    this.memo,
-    this.lengthCm,
-    this.weightG,
-  });
-
-  /// 메모/크기/무게를 업데이트한 복사본 반환
-  CatchRecord copyWith({
-    String? memo,
-    double? lengthCm,
-    double? weightG,
-    bool clearMemo = false,
-  }) {
-    return CatchRecord(
-      imagePath: imagePath,
-      catchTime: catchTime,
-      latitude: latitude,
-      longitude: longitude,
-      locationName: locationName,
-      memo: clearMemo ? null : (memo ?? this.memo),
-      lengthCm: lengthCm ?? this.lengthCm,
-      weightG: weightG ?? this.weightG,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-        'imagePath': imagePath,
-        'catchTime': catchTime.millisecondsSinceEpoch,
-        'latitude': latitude,
-        'longitude': longitude,
-        'locationName': locationName,
-        'memo': memo,
-        'lengthCm': lengthCm,
-        'weightG': weightG,
-      };
-
-  factory CatchRecord.fromJson(Map<String, dynamic> json) => CatchRecord(
-        imagePath: json['imagePath'] as String,
-        catchTime:
-            DateTime.fromMillisecondsSinceEpoch(json['catchTime'] as int),
-        latitude: (json['latitude'] as num?)?.toDouble(),
-        longitude: (json['longitude'] as num?)?.toDouble(),
-        locationName: json['locationName'] as String?,
-        memo: json['memo'] as String?,
-        lengthCm: (json['lengthCm'] as num?)?.toDouble(),
-        weightG: (json['weightG'] as num?)?.toDouble(),
-      );
-
-  factory CatchRecord.fromLegacyPath(String path) {
-    int millis = 0;
-    try {
-      millis = int.parse(p.basename(path).split('_')[0]);
-    } catch (_) {}
-    return CatchRecord(
-      imagePath: path,
-      catchTime: millis > 0
-          ? DateTime.fromMillisecondsSinceEpoch(millis)
-          : DateTime.now(),
-    );
-  }
-}
+const List<Map<String, dynamic>> kCommonGear = [
+  {
+    "name": "낚시대 + 릴 세트",
+    "icon": "🎣",
+    "color": Color(0xFF1976D2),
+    "description": "입문자용 다용도 미니 낚시대 세트. 캠핑·바다낚시에 두루 사용 가능.",
+    "url": "https://www.coupang.com/np/search?q=JAHCHO 캠핑 바다낚시 입문자용 다용도 미니 낚시대 세트",
+  },
+  {
+    "name": "두레박",
+    "icon": "🪣",
+    "color": Color(0xFF00C2A8),
+    "description": "EVA 접이식 두레박. 미끼 물 보관, 잡은 고기 임시 보관에 필수.",
+    "url": "https://www.coupang.com/np/search?q=낚시+잇츠온 EVA 접이식 두레박",
+  },
+  {
+    "name": "가위·집게",
+    "icon": "✂️",
+    "color": Color(0xFFFF8A65),
+    "description": "다용도 스테인리스 낚시 가위 겸용 집게. 라인 자르기·미끼 잡기 등 만능.",
+    "url": "https://www.coupang.com/np/search?q=다용도 스테인리스 낚시 가위 겸용 집게 컨트롤 플라이어",
+  },
+];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📌 GPS + 역지오코딩 서비스
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-class LocationService {
-  static Future<Position?> getCurrentPosition() async {
-    try {
-      LocationPermission perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) {
-        perm = await Geolocator.requestPermission();
-      }
-      if (perm == LocationPermission.deniedForever ||
-          perm == LocationPermission.denied) {
-        return null;
-      }
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 8),
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-
-  static Future<String?> reverseGeocode(double lat, double lon) async {
-    try {
-      final uri = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse'
-        '?format=json&lat=$lat&lon=$lon&accept-language=ko',
-      );
-      final res = await http
-          .get(uri, headers: {'User-Agent': 'FishingApp/1.0'})
-          .timeout(const Duration(seconds: 6));
-
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final addr = data['address'] as Map<String, dynamic>?;
-        if (addr != null) {
-          final parts = [
-            addr['city'] ?? addr['county'] ?? addr['state'],
-            addr['suburb'] ?? addr['town'] ?? addr['village'],
-          ].whereType<String>().toList();
-          return parts.isNotEmpty ? parts.join(' ') : data['display_name'];
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  static String formatCoords(double lat, double lon) {
-    String latStr =
-        '${lat.abs().toStringAsFixed(4)}°${lat >= 0 ? 'N' : 'S'}';
-    String lonStr =
-        '${lon.abs().toStringAsFixed(4)}°${lon >= 0 ? 'E' : 'W'}';
-    return '$latStr $lonStr';
-  }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📌 메인 화면
+// 📌 메인 도감 화면
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class EncyclopediaScreen extends StatefulWidget {
@@ -187,152 +52,77 @@ class EncyclopediaScreen extends StatefulWidget {
 }
 
 class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
-  // ── 장비 데이터 ──────────────────────────────────────────────
-  final List<Map<String, String>> commonGear = [
-    {
-      "name": "낚시대+릴",
-      "url":
-          "https://www.coupang.com/np/search?q=JAHCHO 캠핑 바다낚시 입문자용 다용도 미니 낚시대 세트"
-    },
-    {
-      "name": "두레박",
-      "url":
-          "https://www.coupang.com/np/search?q=낚시+잇츠온 EVA 접이식 두레박"
-    },
-    {
-      "name": "가위, 집개",
-      "url":
-          "https://www.coupang.com/np/search?q=다용도 스테인리스 낚시 가위 겸용 집게 컨트롤 플라이어"
-    },
-  ];
-
-  // ── 기본 어종 ─────────────────────────────────────────────────
-  final List<String> defaultFishNames = [
-    "감성돔",
-    "광어",
-    "우럭",
-    "쥐노래미",
-    "참돔",
-  ];
+  final repo = CatchRecordRepository.instance;
+  StreamSubscription? _changeSub;
 
   List<String> customFishNames = [];
-  Map<String, List<CatchRecord>> recordMap = {};
+  Map<String, List<UnifiedCatchRecord>> recordMap = {};
   bool _isLoading = true;
 
-  List<String> get allFishNames => [...defaultFishNames, ...customFishNames];
+  List<String> get allFishNames =>
+      [...CatchRecordRepository.defaultFishNames, ...customFishNames];
 
-  String _recordsKey(String fishName) => 'records_$fishName';
-
-  // ── 개인 최대어 키 ────────────────────────────────────────────
-  String _pbLengthKey(String fishName) => 'pb_length_$fishName';
-  String _pbWeightKey(String fishName) => 'pb_weight_$fishName';
+  String _pbLengthKey(String f) => 'pb_length_$f';
+  String _pbWeightKey(String f) => 'pb_weight_$f';
 
   @override
   void initState() {
     super.initState();
-    _initData();
-  }
+    _loadData();
+    _changeSub = repo.changes.listen((_) {
+      if (mounted) _loadData(silent: true);
+    });
 
-  Future<void> _initData() async {
-    final prefs = await SharedPreferences.getInstance();
-    customFishNames = prefs.getStringList('custom_fish_list') ?? [];
-
-    for (final name in allFishNames) {
-      recordMap[name] = await _loadRecords(prefs, name);
-    }
-
-    if (mounted) setState(() => _isLoading = false);
-
+    // AI 판독에서 사진+어종 받은 경우 → 통합 폼 자동 띄움
     if (widget.targetFish != null && widget.capturedImage != null) {
-      if (allFishNames.contains(widget.targetFish)) {
-        await _addRecord(widget.targetFish!, widget.capturedImage!, prefs);
-      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _addRecordFromAi(widget.targetFish!, widget.capturedImage!);
+      });
     }
   }
 
-  Future<List<CatchRecord>> _loadRecords(
-      SharedPreferences prefs, String fishName) async {
-    final jsonStr = prefs.getString(_recordsKey(fishName));
-    if (jsonStr != null) {
-      try {
-        final list = jsonDecode(jsonStr) as List<dynamic>;
-        return list
-            .map((e) => CatchRecord.fromJson(e as Map<String, dynamic>))
-            .toList();
-      } catch (_) {}
-    }
-    final legacy = prefs.getStringList(fishName);
-    if (legacy != null && legacy.isNotEmpty) {
-      return legacy.map(CatchRecord.fromLegacyPath).toList();
-    }
-    return [];
+  @override
+  void dispose() {
+    _changeSub?.cancel();
+    super.dispose();
   }
 
-  Future<void> _saveRecords(
-      SharedPreferences prefs, String fishName) async {
-    final list = recordMap[fishName] ?? [];
-    await prefs.setString(
-      _recordsKey(fishName),
-      jsonEncode(list.map((r) => r.toJson()).toList()),
+  Future<void> _loadData({bool silent = false}) async {
+    if (!silent) setState(() => _isLoading = true);
+    customFishNames = await repo.getCustomFishList();
+    final grouped = await repo.groupByFish();
+    recordMap.clear();
+    for (final name in allFishNames) {
+      recordMap[name] = grouped[name] ?? [];
+    }
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  // ━━━ 통합 폼 호출 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  /// AI 판독 결과로 통합 폼 호출 (사진 + 어종 자동 채워짐)
+  Future<void> _addRecordFromAi(String fishName, File tempFile) async {
+    await showUnifiedCatchForm(
+      context,
+      prefilledFishName: fishName,
+      prefilledImage: tempFile,
+      createdFrom: 'ai_scan',
     );
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 기록 추가
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Future<void> _addRecord(
-    String fishName,
-    File tempFile,
-    SharedPreferences prefs,
-  ) async {
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final fishDir = Directory('${directory.path}/$fishName');
-      if (!await fishDir.exists()) await fishDir.create(recursive: true);
-
-      final fileName =
-          "${DateTime.now().millisecondsSinceEpoch}_${p.basename(tempFile.path)}";
-      final permanentFile =
-          await tempFile.copy('${fishDir.path}/$fileName');
-
-      final position = await LocationService.getCurrentPosition();
-      String? locationName;
-      if (position != null) {
-        locationName = await LocationService.reverseGeocode(
-          position.latitude,
-          position.longitude,
-        );
-      }
-
-      final record = CatchRecord(
-        imagePath: permanentFile.path,
-        catchTime: DateTime.now(),
-        latitude: position?.latitude,
-        longitude: position?.longitude,
-        locationName: locationName,
-      );
-
-      final currentList = recordMap[fishName] ?? [];
-      if (!currentList.any((r) => r.imagePath == permanentFile.path)) {
-        currentList.add(record);
-        recordMap[fishName] = currentList;
-        await _saveRecords(prefs, fishName);
-        if (mounted) setState(() {});
-      }
-    } catch (e) {
-      debugPrint("기록 저장 오류: $e");
-    }
+  /// 도감 "사진 추가" 버튼으로 통합 폼 호출 (어종 자동 채워짐)
+  Future<void> _addPhotoToFish(String fishName) async {
+    await showUnifiedCatchForm(
+      context,
+      prefilledFishName: fishName,
+      createdFrom: 'encyclopedia',
+    );
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 메모 + 크기/무게 편집 (신규)
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ━━━ 메모/측정 편집 (기존 기록 수정) ━━━━━━━━━━━━━━━━━━
 
-  Future<void> _showEditMemoDialog(
-      String fishName, CatchRecord record) async {
-    final memoCtrl =
-        TextEditingController(text: record.memo ?? '');
+  Future<void> _showEditMemoDialog(UnifiedCatchRecord record) async {
+    final memoCtrl = TextEditingController(text: record.memo);
     final lengthCtrl = TextEditingController(
         text: record.lengthCm != null
             ? record.lengthCm!.toStringAsFixed(1)
@@ -348,74 +138,24 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: Colors.white,
-        title: const Text(
-          "기록 메모 편집",
-          style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF1976D2)),
-        ),
+        title: const Text("기록 편집",
+            style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF1976D2))),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 자유 메모
-              TextField(
-                controller: memoCtrl,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: '메모',
-                  hintText: '포인트, 미끼 종류, 날씨 등 자유롭게 입력',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  prefixIcon: const Icon(Icons.edit_note,
-                      color: Color(0xFF1976D2)),
-                ),
-              ),
+              _textField(memoCtrl, '메모', '포인트, 미끼 종류, 날씨 등', Icons.edit_note,
+                  maxLines: 3),
               const SizedBox(height: 14),
-              // 길이
-              TextField(
-                controller: lengthCtrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: '길이 (cm)',
-                  hintText: '예: 45.5',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  prefixIcon:
-                      const Icon(Icons.straighten, color: Color(0xFF1976D2)),
-                  suffixText: 'cm',
-                ),
-              ),
+              _textField(lengthCtrl, '길이 (cm)', '예: 45.5', Icons.straighten,
+                  isNumber: true, suffix: 'cm'),
               const SizedBox(height: 14),
-              // 무게
-              TextField(
-                controller: weightCtrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: '무게 (g)',
-                  hintText: '예: 1200',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  prefixIcon: const Icon(Icons.monitor_weight_outlined,
-                      color: Color(0xFF1976D2)),
-                  suffixText: 'g',
-                ),
-              ),
+              _textField(weightCtrl, '무게 (g)', '예: 1200',
+                  Icons.monitor_weight_outlined,
+                  isNumber: true, suffix: 'g'),
             ],
           ),
         ),
@@ -446,11 +186,8 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
                   onPressed: () async {
                     Navigator.pop(ctx);
                     await _saveRecordEdits(
-                      fishName,
                       record,
-                      memoCtrl.text.trim().isEmpty
-                          ? null
-                          : memoCtrl.text.trim(),
+                      memoCtrl.text.trim(),
                       double.tryParse(lengthCtrl.text),
                       double.tryParse(weightCtrl.text),
                     );
@@ -468,57 +205,56 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
     );
   }
 
-  Future<void> _saveRecordEdits(
-    String fishName,
-    CatchRecord original,
-    String? memo,
-    double? lengthCm,
-    double? weightG,
-  ) async {
-    final list = recordMap[fishName] ?? [];
-    final idx =
-        list.indexWhere((r) => r.imagePath == original.imagePath);
-    if (idx < 0) return;
+  Widget _textField(TextEditingController c, String label, String hint,
+      IconData icon,
+      {bool isNumber = false, String? suffix, int maxLines = 1}) {
+    return TextField(
+      controller: c,
+      maxLines: maxLines,
+      keyboardType: isNumber
+          ? const TextInputType.numberWithOptions(decimal: true)
+          : null,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        filled: true,
+        fillColor: Colors.grey.shade100,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        prefixIcon: Icon(icon, color: const Color(0xFF1976D2)),
+        suffixText: suffix,
+      ),
+    );
+  }
 
-    final updated = CatchRecord(
-      imagePath: original.imagePath,
-      catchTime: original.catchTime,
-      latitude: original.latitude,
-      longitude: original.longitude,
-      locationName: original.locationName,
+  Future<void> _saveRecordEdits(UnifiedCatchRecord original, String memo,
+      double? lengthCm, double? weightG) async {
+    await repo.update(original.copyWith(
       memo: memo,
       lengthCm: lengthCm,
       weightG: weightG,
-    );
-    list[idx] = updated;
-    recordMap[fishName] = list;
+    ));
 
-    final prefs = await SharedPreferences.getInstance();
-    await _saveRecords(prefs, fishName);
-
-    // ── 개인 최대어 갱신 체크 ─────────────────────────────────
     bool newPB = false;
+    final prefs = await SharedPreferences.getInstance();
     if (lengthCm != null) {
-      final prevLen = prefs.getDouble(_pbLengthKey(fishName)) ?? 0.0;
-      if (lengthCm > prevLen) {
-        await prefs.setDouble(_pbLengthKey(fishName), lengthCm);
+      final prev = prefs.getDouble(_pbLengthKey(original.fishName)) ?? 0.0;
+      if (lengthCm > prev) {
+        await prefs.setDouble(_pbLengthKey(original.fishName), lengthCm);
         newPB = true;
       }
     }
     if (weightG != null) {
-      final prevWt = prefs.getDouble(_pbWeightKey(fishName)) ?? 0.0;
-      if (weightG > prevWt) {
-        await prefs.setDouble(_pbWeightKey(fishName), weightG);
+      final prev = prefs.getDouble(_pbWeightKey(original.fishName)) ?? 0.0;
+      if (weightG > prev) {
+        await prefs.setDouble(_pbWeightKey(original.fishName), weightG);
         newPB = true;
       }
     }
 
-    if (mounted) {
-      setState(() {});
-      if (newPB) {
-        _showPBAlert(fishName, lengthCm, weightG);
-      }
-    }
+    if (mounted && newPB) _showPBAlert(original.fishName, lengthCm, weightG);
   }
 
   void _showPBAlert(String fishName, double? len, double? wt) {
@@ -530,7 +266,6 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
           ? '무게 ${(wt / 1000).toStringAsFixed(2)} kg'
           : '무게 ${wt.toStringAsFixed(0)} g';
     }
-
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: const Color(0xFFFF6F00),
@@ -566,178 +301,96 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
     );
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 사용자 어종 추가/삭제
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ━━━ 어종 추가/삭제 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Future<void> _showAddCustomFishDialog() async {
-    final TextEditingController nameCtrl = TextEditingController();
-    File? pickedImage;
-
+    final nameCtrl = TextEditingController();
     await showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return StatefulBuilder(builder: (ctx, setInner) {
-          return AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            backgroundColor: Colors.white,
-            title: const Text(
-              "새 어종 추가",
-              style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF1976D2)),
-            ),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        title: const Text("새 어종 추가",
+            style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF1976D2))),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _textField(nameCtrl, '어종 이름', '예: 농어, 광어', Icons.set_meal),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
                 children: [
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: InputDecoration(
-                      labelText: '어종 이름',
-                      hintText: '예: 볼락, 놀래기...',
-                      filled: true,
-                      fillColor: Colors.grey.shade100,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                      prefixIcon:
-                          const Icon(Icons.set_meal, color: Color(0xFF1976D2)),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  GestureDetector(
-                    onTap: () async {
-                      final picker = ImagePicker();
-                      final picked = await picker.pickImage(
-                        source: ImageSource.gallery,
-                        imageQuality: 85,
-                      );
-                      if (picked != null) {
-                        setInner(() => pickedImage = File(picked.path));
-                      }
-                    },
-                    child: Container(
-                      height: 100,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                            color: Colors.blueAccent.withOpacity(0.4),
-                            width: 1.5),
-                      ),
-                      child: pickedImage != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(11),
-                              child: Image.file(pickedImage!,
-                                  fit: BoxFit.cover, width: double.infinity),
-                            )
-                          : const Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_photo_alternate_outlined,
-                                    size: 30, color: Colors.blueAccent),
-                                SizedBox(height: 6),
-                                Text("사진 선택 (선택사항)",
-                                    style: TextStyle(
-                                        color: Colors.blueAccent,
-                                        fontSize: 13)),
-                              ],
-                            ),
+                  Icon(Icons.info_outline,
+                      size: 14, color: Colors.blue.shade700),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '어종 추가 후 사진은 카드의 + 버튼으로 추가하세요',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.blue.shade700,
+                          height: 1.4),
                     ),
                   ),
                 ],
               ),
             ),
-            actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            actions: [
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text("취소"),
-                    ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1976D2),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                      onPressed: () async {
-                        final name = nameCtrl.text.trim();
-                        if (name.isEmpty) return;
-                        Navigator.pop(ctx);
-                        await _addCustomFish(name, pickedImage);
-                      },
-                      child: const Text("추가",
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold)),
-                    ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text("취소"),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1976D2),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
-                ],
+                  onPressed: () async {
+                    final name = nameCtrl.text.trim();
+                    if (name.isEmpty) return;
+                    Navigator.pop(ctx);
+                    await repo.addCustomFish(name);
+                  },
+                  child: const Text("추가",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold)),
+                ),
               ),
             ],
-          );
-        });
-      },
+          ),
+        ],
+      ),
     );
   }
 
-  Future<void> _addCustomFish(String fishName, File? image) async {
-    final prefs = await SharedPreferences.getInstance();
-    if (allFishNames.contains(fishName)) {
-      if (image != null) await _addRecord(fishName, image, prefs);
-      return;
-    }
-    customFishNames.add(fishName);
-    recordMap[fishName] = [];
-    await prefs.setStringList('custom_fish_list', customFishNames);
-    if (image != null) await _addRecord(fishName, image, prefs);
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _deleteFish(String fishName) async {
-    final records = recordMap[fishName] ?? [];
-    for (final r in records) {
-      try {
-        final file = File(r.imagePath);
-        if (await file.exists()) await file.delete();
-      } catch (_) {}
-    }
-    try {
-      final directory = await getApplicationDocumentsDirectory();
-      final fishDir = Directory('${directory.path}/$fishName');
-      if (await fishDir.exists()) await fishDir.delete(recursive: true);
-    } catch (_) {}
-    customFishNames.remove(fishName);
-    recordMap.remove(fishName);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('custom_fish_list', customFishNames);
-    await prefs.remove('records_$fishName');
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _confirmDeleteFish(
-      BuildContext context, String fishName) async {
+  Future<void> _confirmDeleteFish(BuildContext ctx, String fishName) async {
     final confirmed = await showDialog<bool>(
-      context: context,
+      context: ctx,
       builder: (ctx) => AlertDialog(
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -755,44 +408,35 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
                   borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child:
-                const Text("삭제", style: TextStyle(color: Colors.white)),
+            child: const Text("삭제", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
-    if (confirmed == true) await _deleteFish(fishName);
-  }
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 사진 삭제
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Future<void> _deleteRecord(
-      String fishName, CatchRecord record) async {
-    try {
-      final file = File(record.imagePath);
-      if (await file.exists()) await file.delete();
-    } catch (e) {
-      debugPrint("파일 삭제 오류: $e");
+    if (confirmed == true) {
+      for (final r in recordMap[fishName] ?? <UnifiedCatchRecord>[]) {
+        if (r.imagePath != null) {
+          try {
+            final file = File(r.imagePath!);
+            if (await file.exists()) await file.delete();
+          } catch (_) {}
+        }
+      }
+      await repo.deleteByFish(fishName);
     }
-    final list = recordMap[fishName] ?? [];
-    list.removeWhere((r) => r.imagePath == record.imagePath);
-    recordMap[fishName] = list;
-    final prefs = await SharedPreferences.getInstance();
-    await _saveRecords(prefs, fishName);
-    if (mounted) setState(() {});
   }
+
+  // ━━━ 기록 삭제 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Future<void> _confirmDeleteRecord(
-      BuildContext context, String fishName, CatchRecord record) async {
+      BuildContext ctx, UnifiedCatchRecord record) async {
     final confirmed = await showDialog<bool>(
-      context: context,
+      context: ctx,
       builder: (ctx) => AlertDialog(
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("사진 삭제"),
-        content: const Text("이 사진 기록을 삭제할까요?\n삭제하면 복구할 수 없습니다."),
+        title: const Text("기록 삭제"),
+        content: const Text("이 기록을 삭제할까요?\n삭제하면 복구할 수 없습니다."),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -804,59 +448,23 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
                   borderRadius: BorderRadius.circular(8)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child:
-                const Text("삭제", style: TextStyle(color: Colors.white)),
+            child: const Text("삭제", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
-    if (confirmed == true) await _deleteRecord(fishName, record);
+    if (confirmed == true) {
+      if (record.imagePath != null) {
+        try {
+          final file = File(record.imagePath!);
+          if (await file.exists()) await file.delete();
+        } catch (_) {}
+      }
+      await repo.delete(record.id);
+    }
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 사진 추가
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Future<void> _addPhotoToFish(String fishName) async {
-    final source = await _showImageSourceDialog();
-    if (source == null) return;
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(source: source, imageQuality: 85);
-    if (picked == null) return;
-    final prefs = await SharedPreferences.getInstance();
-    await _addRecord(fishName, File(picked.path), prefs);
-  }
-
-  Future<ImageSource?> _showImageSourceDialog() async {
-    return showDialog<ImageSource>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text("사진 추가"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt, color: Color(0xFF1976D2)),
-              title: const Text("카메라로 촬영"),
-              onTap: () => Navigator.pop(ctx, ImageSource.camera),
-            ),
-            ListTile(
-              leading:
-                  const Icon(Icons.photo_library, color: Color(0xFF1976D2)),
-              title: const Text("갤러리에서 선택"),
-              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 상세 팝업 (메모 + 크기/무게 포함)
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ━━━ 상세 팝업 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   String _formatDate(DateTime dt) {
     final amPm = dt.hour < 12 ? '오전' : '오후';
@@ -866,149 +474,121 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
         "$amPm $hour:${dt.minute.toString().padLeft(2, '0')}";
   }
 
-  String _locationText(CatchRecord record) {
-    if (record.locationName != null) return record.locationName!;
-    if (record.latitude != null && record.longitude != null) {
-      return LocationService.formatCoords(
-          record.latitude!, record.longitude!);
-    }
-    return "위치 정보 없음";
-  }
-
-  String _weightLabel(double g) =>
-      g >= 1000 ? '${(g / 1000).toStringAsFixed(2)} kg' : '${g.toStringAsFixed(0)} g';
+  String _weightLabel(double g) => g >= 1000
+      ? '${(g / 1000).toStringAsFixed(2)} kg'
+      : '${g.toStringAsFixed(0)} g';
 
   void _showFishDetailPopup(
-      BuildContext context, String fishName, CatchRecord record) {
+      BuildContext context, UnifiedCatchRecord record) {
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setInner) => Dialog(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24)),
-          elevation: 10,
-          backgroundColor: Colors.white,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  fishName,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        elevation: 10,
+        backgroundColor: Colors.white,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(record.fishName,
                   style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF1976D2)),
-                ),
-                const SizedBox(height: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Image.file(
-                    File(record.imagePath),
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: 230,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 230,
-                      color: Colors.grey.shade200,
-                      child: const Icon(Icons.broken_image, size: 48),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // 포획 일시
-                _InfoTile(
+                      color: Color(0xFF1976D2))),
+              const SizedBox(height: 16),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: record.hasPhoto
+                    ? Image.file(File(record.imagePath!),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: 230,
+                        errorBuilder: (_, __, ___) =>
+                            _buildNoPhotoLarge(record))
+                    : _buildNoPhotoLarge(record),
+              ),
+              const SizedBox(height: 14),
+              _InfoTile(
                   icon: Icons.calendar_month_rounded,
                   label: "포획 일시",
-                  value: _formatDate(record.catchTime),
-                ),
+                  value: _formatDate(record.catchTime)),
+              const SizedBox(height: 8),
+              _InfoTile(
+                icon: record.hasLocation
+                    ? Icons.location_on_rounded
+                    : Icons.location_off_rounded,
+                label: "포획 위치",
+                value: record.displayLocation,
+                iconColor: record.hasLocation
+                    ? const Color(0xFF1976D2)
+                    : Colors.grey,
+              ),
+              if (record.count > 1) ...[
                 const SizedBox(height: 8),
-
-                // 포획 위치
                 _InfoTile(
-                  icon: record.latitude != null
-                      ? Icons.location_on_rounded
-                      : Icons.location_off_rounded,
-                  label: "포획 위치",
-                  value: _locationText(record),
-                  iconColor: record.latitude != null
-                      ? const Color(0xFF1976D2)
-                      : Colors.grey,
-                ),
-
-                // 크기/무게
-                if (record.lengthCm != null || record.weightG != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      if (record.lengthCm != null)
-                        Expanded(
-                          child: _InfoTile(
+                    icon: Icons.water_drop_outlined,
+                    label: "마릿수",
+                    value: '${record.count}마리'),
+              ],
+              if (record.lengthCm != null || record.weightG != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    if (record.lengthCm != null)
+                      Expanded(
+                        child: _InfoTile(
                             icon: Icons.straighten,
                             label: "길이",
                             value:
-                                "${record.lengthCm!.toStringAsFixed(1)} cm",
-                          ),
-                        ),
-                      if (record.lengthCm != null &&
-                          record.weightG != null)
-                        const SizedBox(width: 8),
-                      if (record.weightG != null)
-                        Expanded(
-                          child: _InfoTile(
+                                "${record.lengthCm!.toStringAsFixed(1)} cm"),
+                      ),
+                    if (record.lengthCm != null && record.weightG != null)
+                      const SizedBox(width: 8),
+                    if (record.weightG != null)
+                      Expanded(
+                        child: _InfoTile(
                             icon: Icons.monitor_weight_outlined,
                             label: "무게",
-                            value: _weightLabel(record.weightG!),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-
-                // 메모
-                if (record.memo != null && record.memo!.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  _InfoTile(
+                            value: _weightLabel(record.weightG!)),
+                      ),
+                  ],
+                ),
+              ],
+              if (record.memo.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _InfoTile(
                     icon: Icons.sticky_note_2_outlined,
                     label: "메모",
-                    value: record.memo!,
-                  ),
-                ],
-
-                const SizedBox(height: 18),
-
-                // 버튼 행: 메모 편집 / 공유 / 닫기
-                Row(
-                  children: [
-                    // 메모 편집
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          side: const BorderSide(
-                              color: Color(0xFF1976D2)),
-                        ),
-                        icon: const Icon(Icons.edit,
-                            color: Color(0xFF1976D2), size: 18),
-                        label: const Text("메모",
-                            style: TextStyle(color: Color(0xFF1976D2))),
-                        onPressed: () async {
-                          Navigator.pop(ctx);
-                          await _showEditMemoDialog(fishName, record);
-                        },
+                    value: record.memo),
+              ],
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        side: const BorderSide(color: Color(0xFF1976D2)),
                       ),
+                      icon: const Icon(Icons.edit,
+                          color: Color(0xFF1976D2), size: 18),
+                      label: const Text("편집",
+                          style: TextStyle(color: Color(0xFF1976D2))),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        await _showEditMemoDialog(record);
+                      },
                     ),
-                    const SizedBox(width: 8),
-                    // 공유
+                  ),
+                  const SizedBox(width: 8),
+                  if (record.hasPhoto) ...[
                     Expanded(
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                           side: const BorderSide(color: Colors.green),
@@ -1017,99 +597,103 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
                             color: Colors.green, size: 18),
                         label: const Text("공유",
                             style: TextStyle(color: Colors.green)),
-                        onPressed: () =>
-                            _shareRecord(fishName, record),
+                        onPressed: () => _shareRecord(record),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // 닫기
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2B3A55),
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('닫기',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white)),
-                      ),
-                    ),
                   ],
-                ),
-              ],
-            ),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2B3A55),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('닫기',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 공유 (신규) — share_plus 사용
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  Future<void> _shareRecord(String fishName, CatchRecord record) async {
-  await ShareCardUtil.shareRecord(
-    context,
-    fishName: fishName,
-    record: CatchRecordForShare(
-      imagePath: record.imagePath,
-      catchTime: record.catchTime,
-      locationName: record.locationName,
-      latitude: record.latitude,
-      longitude: record.longitude,
-      lengthCm: record.lengthCm,
-      weightG: record.weightG,
-      memo: record.memo,
-      ),
-    );
-  }
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 조황 일지 화면 열기 (신규)
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  void _openJournal() {
-    // 전체 기록을 날짜순으로 정렬해 전달
-    final allRecords = <_JournalEntry>[];
-    for (final fish in allFishNames) {
-      for (final r in recordMap[fish] ?? []) {
-        allRecords.add(_JournalEntry(fishName: fish, record: r));
-      }
-    }
-    allRecords.sort((a, b) =>
-        b.record.catchTime.compareTo(a.record.catchTime));
-
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => _JournalScreen(
-          entries: allRecords,
-          onShare: _shareRecord,
-          onEdit: _showEditMemoDialog,
+  Widget _buildNoPhotoLarge(UnifiedCatchRecord record) {
+    return Container(
+      height: 230,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF1976D2).withOpacity(0.08),
+            const Color(0xFF42A5F5).withOpacity(0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
       ),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(record.emoji, style: const TextStyle(fontSize: 72)),
+          const SizedBox(height: 10),
+          Text(
+            record.spotName ?? "지도에서 기록한 조과",
+            style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 13,
+                fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          const Text("📷 사진 없음",
+              style: TextStyle(color: Colors.grey, fontSize: 11)),
+        ],
+      ),
     );
   }
 
-  // ── URL 런처 ──────────────────────────────────────────────────
-  Future<void> _launchURL(String? urlString) async {
-    if (urlString == null) return;
-    final Uri url = Uri.parse(urlString);
-    try {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } catch (e) {
-      debugPrint("Could not launch $url : $e");
+  Future<void> _shareRecord(UnifiedCatchRecord record) async {
+    if (!record.hasPhoto) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("사진이 없는 기록은 공유할 수 없어요"),
+            behavior: SnackBarBehavior.floating),
+      );
+      return;
     }
+    await ShareCardUtil.shareRecord(
+      context,
+      fishName: record.fishName,
+      record: CatchRecordForShare(
+        imagePath: record.imagePath!,
+        catchTime: record.catchTime,
+        locationName: record.displayLocation == '위치 정보 없음'
+            ? null
+            : record.displayLocation,
+        latitude: record.latitude,
+        longitude: record.longitude,
+        lengthCm: record.lengthCm,
+        weightG: record.weightG,
+        memo: record.memo.isEmpty ? null : record.memo,
+      ),
+    );
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 UI 빌드
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  void _openGearShop() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const GearShopScreen()));
+  }
+
+  // ━━━ UI 빌드 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   @override
   Widget build(BuildContext context) {
@@ -1118,46 +702,25 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
           body: Center(child: CircularProgressIndicator()));
     }
 
+    final collected = allFishNames
+        .where((n) => (recordMap[n]?.isNotEmpty ?? false))
+        .length;
+    final total = allFishNames.length;
+    final progress = total > 0 ? collected / total : 0.0;
+
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('내 도감 및 장비 추천',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('낚시 도감',
+            style: TextStyle(fontWeight: FontWeight.w900)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
-        actions: [
-          // 📋 조황 일지 버튼
-          IconButton(
-            icon: const Icon(Icons.menu_book_rounded,
-                color: Color(0xFF1976D2)),
-            tooltip: "조황 일지",
-            onPressed: _openJournal,
-          ),
-          // 수집 통계 뱃지
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: _StatsBadge(
-                total: allFishNames.length,
-                collected: allFishNames
-                    .where((n) => (recordMap[n]?.isNotEmpty ?? false))
-                    .length,
-              ),
-            ),
-          ),
-        ],
       ),
-
-      // ── 하단 고정 버튼 ────────────────────────────────────────
       bottomSheet: Container(
         width: double.infinity,
         padding: EdgeInsets.fromLTRB(
-          16,
-          12,
-          16,
-          MediaQuery.of(context).padding.bottom + 16, // ← 여백 충분히
-        ),
+            16, 12, 16, MediaQuery.of(context).padding.bottom + 16),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -1171,13 +734,11 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
         child: ElevatedButton.icon(
           onPressed: _showAddCustomFishDialog,
           icon: const Icon(Icons.add, color: Colors.white, size: 22),
-          label: const Text(
-            "어종 추가",
-            style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16),
-          ),
+          label: const Text("어종 추가",
+              style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16)),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF1976D2),
             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -1187,83 +748,44 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
           ),
         ),
       ),
-
       body: ListView(
-        // bottomSheet 높이(버튼 56 + 패딩) + 추가 여백
         padding: EdgeInsets.fromLTRB(
-          16,
-          16,
-          16,
-          MediaQuery.of(context).padding.bottom + 120, // ← 충분한 하단 여백
-        ),
+            16, 12, 16, MediaQuery.of(context).padding.bottom + 120),
         children: [
-          // ── 필수 공용 장비 ─────────────────────────────────────
-          const Text("필수 공용 장비",
-              style:
-                  TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          _buildCompactProgress(collected, total, progress),
           const SizedBox(height: 12),
-          SizedBox(
-            height: 100,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: commonGear.length,
-              itemBuilder: (context, index) => Container(
-                width: 160,
-                margin: const EdgeInsets.only(right: 12),
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.blueAccent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: Colors.blueAccent),
-                    ),
-                  ),
-                  onPressed: () => _launchURL(commonGear[index]['url']),
-                  child: Text(
-                    commonGear[index]['name']!,
-                    textAlign: TextAlign.center,
-                    style:
-                        const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 12),
-
-          // ── 섹션 헤더 ──────────────────────────────────────────
+          _buildGearShopButton(),
+          const SizedBox(height: 20),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text("어종별 수집 현황",
+              const Text("📖 어종 도감",
                   style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
-              Text(
-                "${allFishNames.where((n) => recordMap[n]?.isNotEmpty ?? false).length} / ${allFishNames.length} 종",
-                style: const TextStyle(
-                    color: Color(0xFF1976D2),
-                    fontWeight: FontWeight.bold),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF212529))),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text("$collected / $total 종",
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF868E96),
+                        fontWeight: FontWeight.w600)),
               ),
             ],
           ),
           const SizedBox(height: 12),
-
-          // ── 어종 카드 리스트 ──────────────────────────────────
           ...allFishNames.map((name) {
-            final records = recordMap[name] ?? [];
+            final records = recordMap[name] ?? <UnifiedCatchRecord>[];
             final isCustom = customFishNames.contains(name);
             return _FishCard(
               fishName: name,
               records: records,
               isCustom: isCustom,
               onPhotoAdd: () => _addPhotoToFish(name),
-              onRecordTap: (record) =>
-                  _showFishDetailPopup(context, name, record),
-              onRecordDelete: (record) =>
-                  _confirmDeleteRecord(context, name, record),
+              onRecordTap: (r) => _showFishDetailPopup(context, r),
+              onRecordDelete: (r) => _confirmDeleteRecord(context, r),
               onFishDelete: isCustom
                   ? () => _confirmDeleteFish(context, name)
                   : null,
@@ -1273,336 +795,342 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen> {
       ),
     );
   }
-}
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📌 조황 일지 화면 (신규)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-class _JournalEntry {
-  final String fishName;
-  final CatchRecord record;
-  _JournalEntry({required this.fishName, required this.record});
-}
-
-class _JournalScreen extends StatelessWidget {
-  final List<_JournalEntry> entries;
-  final Future<void> Function(String, CatchRecord) onShare;
-  final Future<void> Function(String, CatchRecord) onEdit;
-
-  const _JournalScreen({
-    required this.entries,
-    required this.onShare,
-    required this.onEdit,
-  });
-
-  String _dayKey(DateTime dt) =>
-      "${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')}";
-
-  String _timeStr(DateTime dt) {
-    final amPm = dt.hour < 12 ? '오전' : '오후';
-    final h = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
-    return "$amPm $h:${dt.minute.toString().padLeft(2, '0')}";
+  Widget _buildCompactProgress(int collected, int total, double progress) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1976D2), Color(0xFF42A5F5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1976D2).withOpacity(0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Text("🐟", style: TextStyle(fontSize: 22)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text("$collected",
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            height: 1.0)),
+                    Text(" / $total 종",
+                        style: TextStyle(
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600)),
+                    const Spacer(),
+                    Text("${(progress * 100).toStringAsFixed(0)}%",
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900)),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 5,
+                    backgroundColor: Colors.white.withOpacity(0.25),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFFFFD54F)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
-  String _weightLabel(double g) =>
-      g >= 1000 ? '${(g / 1000).toStringAsFixed(2)} kg' : '${g.toStringAsFixed(0)} g';
+  Widget _buildGearShopButton() {
+    return GestureDetector(
+      onTap: _openGearShop,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE9ECEF)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1976D2).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              alignment: Alignment.center,
+              child: const Text("🛠️", style: TextStyle(fontSize: 22)),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("장비 추천 보기",
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF212529))),
+                  SizedBox(height: 2),
+                  Text("낚시 입문자를 위한 필수 장비 3종",
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF868E96),
+                          fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios,
+                size: 14, color: Color(0xFF868E96)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 📌 장비 추천 페이지
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+class GearShopScreen extends StatelessWidget {
+  const GearShopScreen({super.key});
+
+  Future<void> _launchURL(String url) async {
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint("Could not launch $url : $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // 날짜별로 그룹핑
-    final Map<String, List<_JournalEntry>> grouped = {};
-    for (final e in entries) {
-      final key = _dayKey(e.record.catchTime);
-      grouped.putIfAbsent(key, () => []).add(e);
-    }
-    final days = grouped.keys.toList()
-      ..sort((a, b) => b.compareTo(a));
-
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text('조황 일지',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('장비 추천',
+            style: TextStyle(fontWeight: FontWeight.w900)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,
       ),
-      body: entries.isEmpty
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.phishing, size: 64, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text("아직 기록이 없습니다.",
-                      style: TextStyle(color: Colors.grey, fontSize: 16)),
-                ],
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1976D2), Color(0xFF42A5F5)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-              itemCount: days.length,
-              itemBuilder: (context, dayIdx) {
-                final day = days[dayIdx];
-                final dayEntries = grouped[day]!;
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 날짜 헤더
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF1976D2),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(day,
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13)),
-                          ),
-                          const SizedBox(width: 8),
-                          Text("${dayEntries.length}마리",
-                              style: const TextStyle(
-                                  color: Colors.grey, fontSize: 13)),
-                        ],
-                      ),
-                    ),
-
-                    // 타임라인 항목들
-                    ...dayEntries.asMap().entries.map((entry) {
-                      final isLast =
-                          entry.key == dayEntries.length - 1;
-                      final e = entry.value;
-                      final r = e.record;
-
-                      return IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 타임라인 라인 + 원
-                            SizedBox(
-                              width: 32,
-                              child: Column(
-                                children: [
-                                  Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF1976D2),
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                          color: Colors.white, width: 2),
-                                    ),
-                                  ),
-                                  if (!isLast)
-                                    Expanded(
-                                      child: Container(
-                                        width: 2,
-                                        color: Colors.blue.shade100,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-
-                            // 카드
-                            Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                    bottom: isLast ? 24 : 14),
-                                child: Card(
-                                  elevation: 1,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(12)),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        // 썸네일
-                                        ClipRRect(
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                          child: Image.file(
-                                            File(r.imagePath),
-                                            width: 70,
-                                            height: 70,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) =>
-                                                Container(
-                                              width: 70,
-                                              height: 70,
-                                              color: Colors.grey.shade200,
-                                              child: const Icon(
-                                                  Icons.broken_image,
-                                                  size: 28),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-
-                                        // 텍스트 정보
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Text(e.fishName,
-                                                      style: const TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          fontSize: 15)),
-                                                  const Spacer(),
-                                                  Text(_timeStr(r.catchTime),
-                                                      style: TextStyle(
-                                                          color: Colors
-                                                              .grey.shade500,
-                                                          fontSize: 12)),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 4),
-                                              if (r.locationName != null)
-                                                Row(
-                                                  children: [
-                                                    const Icon(
-                                                        Icons.location_on,
-                                                        size: 13,
-                                                        color: Colors.blueGrey),
-                                                    const SizedBox(width: 2),
-                                                    Flexible(
-                                                      child: Text(
-                                                          r.locationName!,
-                                                          style: const TextStyle(
-                                                              fontSize: 12,
-                                                              color: Colors
-                                                                  .blueGrey),
-                                                          overflow:
-                                                              TextOverflow
-                                                                  .ellipsis),
-                                                    ),
-                                                  ],
-                                                ),
-                                              if (r.lengthCm != null ||
-                                                  r.weightG != null)
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                          top: 3),
-                                                  child: Wrap(
-                                                    spacing: 8,
-                                                    children: [
-                                                      if (r.lengthCm != null)
-                                                        _Chip(
-                                                          icon: Icons.straighten,
-                                                          label:
-                                                              "${r.lengthCm!.toStringAsFixed(1)} cm",
-                                                        ),
-                                                      if (r.weightG != null)
-                                                        _Chip(
-                                                          icon: Icons
-                                                              .monitor_weight_outlined,
-                                                          label: _weightLabel(
-                                                              r.weightG!),
-                                                        ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              if (r.memo != null &&
-                                                  r.memo!.isNotEmpty)
-                                                Padding(
-                                                  padding:
-                                                      const EdgeInsets.only(
-                                                          top: 4),
-                                                  child: Text(
-                                                    r.memo!,
-                                                    style: const TextStyle(
-                                                        fontSize: 12,
-                                                        color: Colors.black54,
-                                                        fontStyle:
-                                                            FontStyle.italic),
-                                                    maxLines: 2,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-
-                                        // 공유 버튼
-                                        IconButton(
-                                          icon: const Icon(Icons.share,
-                                              size: 18,
-                                              color: Colors.blueGrey),
-                                          tooltip: "공유",
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
-                                          onPressed: () =>
-                                              onShare(e.fishName, r),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
-                );
-              },
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF1976D2).withOpacity(0.2),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
+            child: Row(
+              children: [
+                const Text("🎣", style: TextStyle(fontSize: 36)),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("낚시 입문 필수 장비",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900)),
+                      SizedBox(height: 4),
+                      Text("처음 시작하는 분들을 위한 기본 세트.\n탭하면 쿠팡에서 검색돼요.",
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              height: 1.4)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          ...kCommonGear.map((gear) => _GearDetailCard(
+                name: gear['name'],
+                icon: gear['icon'],
+                description: gear['description'],
+                color: gear['color'],
+                onTap: () => _launchURL(gear['url']),
+              )),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.amber.shade200),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline,
+                    color: Colors.amber.shade800, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "본 앱은 장비 판매처와 제휴 관계가 없으며, 쿠팡 검색 결과로 안내해드립니다. "
+                    "실제 구매 시에는 가격·리뷰·재고 등을 직접 확인해주세요.",
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.amber.shade900,
+                        height: 1.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📌 보조 위젯들
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+class _GearDetailCard extends StatelessWidget {
+  final String name;
+  final String icon;
+  final String description;
+  final Color color;
+  final VoidCallback onTap;
 
-class _StatsBadge extends StatelessWidget {
-  final int total;
-  final int collected;
-  const _StatsBadge({required this.total, required this.collected});
+  const _GearDetailCard({
+    required this.name,
+    required this.icon,
+    required this.description,
+    required this.color,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF1976D2).withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      child: Text(
-        "🎣 $collected/$total",
-        style: const TextStyle(
-            color: Color(0xFF1976D2),
-            fontWeight: FontWeight.bold,
-            fontSize: 13),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 60, height: 60,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
+                child: Text(icon, style: const TextStyle(fontSize: 32)),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name,
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF212529))),
+                    const SizedBox(height: 4),
+                    Text(description,
+                        style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B7684),
+                            height: 1.45)),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.shopping_cart, size: 12, color: color),
+                        const SizedBox(width: 4),
+                        Text("쿠팡에서 보기",
+                            style: TextStyle(
+                                fontSize: 11,
+                                color: color,
+                                fontWeight: FontWeight.w800)),
+                        const SizedBox(width: 2),
+                        Icon(Icons.open_in_new, size: 11, color: color),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 📌 보조 위젯
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class _InfoTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
   final Color iconColor;
-
   const _InfoTile({
     required this.icon,
     required this.label,
@@ -1646,43 +1174,13 @@ class _InfoTile extends StatelessWidget {
   }
 }
 
-/// 조황 일지용 소형 정보 칩
-class _Chip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _Chip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1976D2).withOpacity(0.08),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: const Color(0xFF1976D2)),
-          const SizedBox(width: 3),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF1976D2),
-                  fontWeight: FontWeight.w600)),
-        ],
-      ),
-    );
-  }
-}
-
 class _FishCard extends StatelessWidget {
   final String fishName;
-  final List<CatchRecord> records;
+  final List<UnifiedCatchRecord> records;
   final bool isCustom;
   final VoidCallback onPhotoAdd;
-  final void Function(CatchRecord) onRecordTap;
-  final void Function(CatchRecord) onRecordDelete;
+  final void Function(UnifiedCatchRecord) onRecordTap;
+  final void Function(UnifiedCatchRecord) onRecordDelete;
   final VoidCallback? onFishDelete;
 
   const _FishCard({
@@ -1698,12 +1196,10 @@ class _FishCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool isCollected = records.isNotEmpty;
-
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       clipBehavior: Clip.antiAlias,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1723,21 +1219,17 @@ class _FishCard extends StatelessWidget {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: Image.file(
-                              File(record.imagePath),
-                              width: 220,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                  width: 220,
-                                  color: Colors.grey.shade200,
-                                  child: const Icon(Icons.broken_image)),
-                            ),
+                            child: record.hasPhoto
+                                ? Image.file(File(record.imagePath!),
+                                    width: 220,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        _noPhotoThumb(record))
+                                : _noPhotoThumb(record),
                           ),
-                          // GPS 아이콘
-                          if (record.latitude != null)
+                          if (record.hasLocation)
                             Positioned(
-                              top: 6,
-                              right: 6,
+                              top: 6, right: 6,
                               child: Container(
                                 padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(
@@ -1748,12 +1240,9 @@ class _FishCard extends StatelessWidget {
                                     color: Colors.white, size: 14),
                               ),
                             ),
-                          // 메모 아이콘 (메모 있을 때)
-                          if (record.memo != null &&
-                              record.memo!.isNotEmpty)
+                          if (record.memo.isNotEmpty)
                             Positioned(
-                              bottom: 6,
-                              right: 6,
+                              bottom: 6, right: 6,
                               child: Container(
                                 padding: const EdgeInsets.all(4),
                                 decoration: BoxDecoration(
@@ -1765,24 +1254,35 @@ class _FishCard extends StatelessWidget {
                                     color: Colors.white, size: 14),
                               ),
                             ),
-                          // 삭제 버튼
+                          if (!record.hasPhoto)
+                            Positioned(
+                              bottom: 6, left: 6,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.black54,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text("📷 사진 없음",
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10)),
+                              ),
+                            ),
                           Positioned(
-                            top: 6,
-                            left: 6,
+                            top: 6, left: 6,
                             child: GestureDetector(
                               onTap: () => onRecordDelete(record),
                               child: Container(
-                                width: 28,
-                                height: 28,
+                                width: 28, height: 28,
                                 decoration: BoxDecoration(
                                   color: Colors.red.shade600,
                                   shape: BoxShape.circle,
                                   boxShadow: [
                                     BoxShadow(
-                                      color:
-                                          Colors.black.withOpacity(0.3),
-                                      blurRadius: 4,
-                                    ),
+                                        color: Colors.black.withOpacity(0.3),
+                                        blurRadius: 4),
                                   ],
                                 ),
                                 child: const Icon(Icons.close,
@@ -1808,12 +1308,11 @@ class _FishCard extends StatelessWidget {
                         fontWeight: FontWeight.bold)),
               ),
             ),
-
           ListTile(
             title: Text(fishName,
                 style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(isCollected
-                ? "수집 완료 (${records.length}마리)"
+                ? "수집 완료 (${records.length}건)"
                 : "미수집"),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1821,7 +1320,7 @@ class _FishCard extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.add_photo_alternate_outlined,
                       color: Color(0xFF1976D2)),
-                  tooltip: "사진 추가",
+                  tooltip: "사진 + 정보 추가",
                   onPressed: onPhotoAdd,
                 ),
                 if (onFishDelete != null)
@@ -1834,6 +1333,54 @@ class _FishCard extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _noPhotoThumb(UnifiedCatchRecord r) {
+    return Container(
+      width: 220, height: 180,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF1976D2).withOpacity(0.1),
+            const Color(0xFF42A5F5).withOpacity(0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(r.emoji, style: const TextStyle(fontSize: 56)),
+          const SizedBox(height: 6),
+          Text(
+            r.spotName ?? '지도에서 기록',
+            style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 11,
+                fontWeight: FontWeight.w600),
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (r.count > 1) ...[
+            const SizedBox(height: 4),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1976D2),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text('${r.count}마리',
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold)),
+            ),
+          ],
         ],
       ),
     );

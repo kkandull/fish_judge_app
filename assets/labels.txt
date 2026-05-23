@@ -1,6 +1,11 @@
-감성돔
-광어
-우럭
-쥐노래미
-참돔
-알 수 없음
+0_black_sea_bream
+1_flat_fish
+2_rock_fish
+3_fat_greenling
+4_red_seabream
+5_background
+6_bellied_greenling
+7_flounder
+8_black_rabbitfish
+9_rudder_fish
+10_marbled_rockfish
