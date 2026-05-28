@@ -147,7 +147,7 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
                     decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
                     child: Column(
                       children: [
-                        Text("📍 ${widget.label} 보호 규정", 
+                        Text("${widget.label} 보호 규정", 
                             style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
                         const SizedBox(height: 4),
                         Text("금지체장 기준: $limit", 

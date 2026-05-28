@@ -9,7 +9,6 @@
 //   reports/{reportId}                       — 신고
 //
 // ⚠️ 인덱스 없이 동작하도록 클라이언트 필터링 사용.
-// 데이터가 많아지면 (1000+) 인덱스 추가 권장.
 
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -18,6 +17,31 @@ import '../utils/image_encoder.dart';
 import '../utils/profanity_filter.dart';
 import 'auth_service.dart';
 import 'block_service.dart';
+
+/// 게시글 정렬 옵션
+enum PostSortOption {
+  latest('최신순', '🕐'),
+  popular('인기순', '🔥'),
+  mostCommented('댓글 많은 순', '💬');
+
+  final String label;
+  final String emoji;
+  const PostSortOption(this.label, this.emoji);
+}
+
+/// 게시글 카테고리
+enum PostCategory {
+  all('전체', null, ''),
+  catch_('조과 자랑', 'catch', ''),
+  question('질문', 'question', ''),
+  info('정보 공유', 'info', ''),
+  myPosts('내 글', null, '');
+
+  final String label;
+  final String? value;
+  final String emoji;
+  const PostCategory(this.label, this.value, this.emoji);
+}
 
 class PostService {
   static final PostService instance = PostService._();
@@ -31,24 +55,22 @@ class PostService {
   // 게시글 작성
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   
-  /// 새 게시글 작성
-  /// 
-  /// 반환: 생성된 postId
   Future<String> createPost({
     required String title,
     required String body,
     File? image,
     String? linkedFishName,
+    List<String> imageBase64Thumbs = const [],
+    List<String> imageBase64Fulls = const [],
+    String category = 'catch', // ✅ 추가
     List<String> tags = const [],
   }) async {
-    // 1. 인증 확인
     final uid = AuthService.instance.uid;
     if (uid == null) throw Exception('로그인이 필요해요');
 
     final nickname = await AuthService.instance.getNickname();
     if (nickname == null) throw Exception('닉네임을 먼저 설정해주세요');
 
-    // 2. 검증
     final trimmedTitle = title.trim();
     final trimmedBody = body.trim();
 
@@ -57,34 +79,21 @@ class PostService {
     if (trimmedBody.isEmpty) throw Exception('내용을 입력해주세요');
     if (trimmedBody.length > 2000) throw Exception('내용은 2000자 이내로 작성해주세요');
 
-    // 욕설 검사
     final titleCheck = ProfanityFilter.validate(trimmedTitle);
     if (titleCheck != null) throw Exception('제목: $titleCheck');
     final bodyCheck = ProfanityFilter.validate(trimmedBody);
     if (bodyCheck != null) throw Exception('내용: $bodyCheck');
 
-    // 3. 이미지 인코딩
-    String? thumb, full;
-    if (image != null) {
-      try {
-        final encoded = await ImageEncoder.encodeImage(image);
-        thumb = encoded['thumbnail'];
-        full = encoded['full'];
-      } catch (e) {
-        throw Exception('이미지 처리 실패: ${e.toString().replaceAll('Exception: ', '')}');
-      }
-    }
-
-    // 4. Firestore에 저장
     final post = CommunityPost(
       id: '',
       uid: uid,
       nickname: nickname,
       title: trimmedTitle,
       body: trimmedBody,
-      imageBase64Thumb: thumb,
-      imageBase64Full: full,
+      imageBase64Thumbs: imageBase64Thumbs,
+      imageBase64Fulls: imageBase64Fulls,
       linkedFishName: linkedFishName,
+      category: category,
       createdAt: DateTime.now(),
       tags: tags,
     );
@@ -94,37 +103,84 @@ class PostService {
   }
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 게시글 조회
+  // 게시글 조회 — ✅ 통합 검색/정렬/카테고리
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  /// 게시글 목록 실시간 스트림 (최신순)
-  /// 
-  /// 인덱스 없이 동작: orderBy만 사용하고 isReported / 차단 필터는 클라이언트에서.
-  /// 차단한 사용자 게시글도 자동 필터링.
-  Stream<List<CommunityPost>> watchPosts({int limit = 30}) async* {
+  /// 게시글 목록 실시간 스트림
+  ///
+  /// [searchKeyword]: 제목/본문/닉네임/어종에서 매칭
+  /// [sort]: 최신순/인기순/댓글많은순
+  /// [category]: 전체/조과/질문/정보/내글
+  Stream<List<CommunityPost>> watchPosts({
+    int limit = 50,
+    String searchKeyword = '',
+    PostSortOption sort = PostSortOption.latest,
+    PostCategory category = PostCategory.all,
+    int refreshTrigger = 0,
+  }) async* {
     final blockedUids = await BlockService.getBlockedUids();
-    
-    // ⚠️ where 제거 — 인덱스 없이 단순 orderBy만 사용
+    final myUid = AuthService.instance.uid;
+    final keyword = searchKeyword.trim().toLowerCase();
+
     yield* _posts
         .orderBy('createdAt', descending: true)
-        .limit(limit * 2) // 필터링으로 줄어들 수 있어 여유 있게
+        .limit(limit * 3) // 필터 후 줄어드는 거 대비
         .snapshots()
-        .map((snap) => snap.docs
-            .map(CommunityPost.fromDoc)
-            .where((p) => !p.isReported)              // 신고된 글 제외
-            .where((p) => !blockedUids.contains(p.uid)) // 차단 사용자 제외
-            .take(limit) // 원하는 개수만큼만
-            .toList());
+        .map((snap) {
+          var posts = snap.docs.map(CommunityPost.fromDoc).toList();
+
+          // 1. 신고된 글 제거
+          posts = posts.where((p) => !p.isReported).toList();
+
+          // 2. 차단 사용자 제거
+          posts = posts.where((p) => !blockedUids.contains(p.uid)).toList();
+
+          // 3. 카테고리 필터
+          if (category == PostCategory.myPosts && myUid != null) {
+            posts = posts.where((p) => p.uid == myUid).toList();
+          } else if (category.value != null) {
+            posts = posts.where((p) => p.category == category.value).toList();
+          }
+
+          // 4. 검색어 필터 (lowercase contains)
+          if (keyword.isNotEmpty) {
+            posts = posts.where((p) {
+              final target = '${p.title} ${p.body} ${p.nickname} ${p.linkedFishName ?? ''}'.toLowerCase();
+              return target.contains(keyword);
+            }).toList();
+          }
+
+          // 5. 정렬
+          switch (sort) {
+            case PostSortOption.latest:
+              // 이미 createdAt 내림차순
+              break;
+            case PostSortOption.popular:
+              posts.sort((a, b) {
+                final cmp = b.likeCount.compareTo(a.likeCount);
+                if (cmp != 0) return cmp;
+                return b.createdAt.compareTo(a.createdAt);
+              });
+              break;
+            case PostSortOption.mostCommented:
+              posts.sort((a, b) {
+                final cmp = b.commentCount.compareTo(a.commentCount);
+                if (cmp != 0) return cmp;
+                return b.createdAt.compareTo(a.createdAt);
+              });
+              break;
+          }
+
+          return posts.take(limit).toList();
+        });
   }
 
-  /// 단일 게시글 가져오기
   Future<CommunityPost?> getPost(String postId) async {
     final doc = await _posts.doc(postId).get();
     if (!doc.exists) return null;
     return CommunityPost.fromDoc(doc);
   }
 
-  /// 단일 게시글 실시간 스트림 (좋아요/댓글 카운트 동기화용)
   Stream<CommunityPost?> watchPost(String postId) {
     return _posts.doc(postId).snapshots().map((doc) {
       if (!doc.exists) return null;
@@ -132,30 +188,10 @@ class PostService {
     });
   }
 
-  /// 본인이 작성한 게시글 목록
-  /// 
-  /// where(uid) + orderBy(createdAt) 복합 인덱스 필요할 수 있음.
-  /// 처음 호출 시 에러 나면 콘솔의 자동 생성 링크 클릭.
-  Stream<List<CommunityPost>> watchMyPosts() {
-    final uid = AuthService.instance.uid;
-    if (uid == null) return Stream.value([]);
-    
-    // uid로만 필터, 정렬은 클라이언트에서
-    return _posts
-        .where('uid', isEqualTo: uid)
-        .snapshots()
-        .map((snap) {
-          final list = snap.docs.map(CommunityPost.fromDoc).toList();
-          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          return list;
-        });
-  }
-
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 게시글 삭제
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  /// 게시글 삭제 (본인만 가능, 보안 규칙에서도 검증)
   Future<void> deletePost(String postId) async {
     final uid = AuthService.instance.uid;
     if (uid == null) throw Exception('로그인이 필요해요');
@@ -164,8 +200,6 @@ class PostService {
     if (post == null) throw Exception('게시글이 없어요');
     if (post.uid != uid) throw Exception('본인 게시글만 삭제할 수 있어요');
     
-    // 댓글 / 좋아요 서브컬렉션은 자동 삭제 안 됨
-    // 일단 게시글만 삭제 (서브컬렉션은 클라우드 함수로 처리 - 발표 단계에선 생략)
     await _posts.doc(postId).delete();
   }
 
@@ -173,9 +207,6 @@ class PostService {
   // 좋아요
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  /// 좋아요 토글 (눌렀으면 취소, 안 눌렀으면 추가)
-  /// 
-  /// 반환: 토글 후 상태 (true = 좋아요 됨, false = 취소됨)
   Future<bool> toggleLike(String postId) async {
     final uid = AuthService.instance.uid;
     if (uid == null) throw Exception('로그인이 필요해요');
@@ -187,12 +218,10 @@ class PostService {
       final likeDoc = await tx.get(likeRef);
       
       if (likeDoc.exists) {
-        // 좋아요 취소
         tx.delete(likeRef);
         tx.update(postRef, {'likeCount': FieldValue.increment(-1)});
         return false;
       } else {
-        // 좋아요 추가
         tx.set(likeRef, {'likedAt': FieldValue.serverTimestamp()});
         tx.update(postRef, {'likeCount': FieldValue.increment(1)});
         return true;
@@ -200,7 +229,6 @@ class PostService {
     });
   }
 
-  /// 사용자가 이 게시글에 좋아요 했는지 확인
   Future<bool> hasLiked(String postId) async {
     final uid = AuthService.instance.uid;
     if (uid == null) return false;
@@ -209,7 +237,6 @@ class PostService {
     return doc.exists;
   }
 
-  /// 좋아요 여부 실시간 스트림
   Stream<bool> watchLiked(String postId) {
     final uid = AuthService.instance.uid;
     if (uid == null) return Stream.value(false);
@@ -223,7 +250,6 @@ class PostService {
   // 댓글
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  /// 댓글 작성
   Future<void> addComment(String postId, String body) async {
     final uid = AuthService.instance.uid;
     if (uid == null) throw Exception('로그인이 필요해요');
@@ -252,7 +278,6 @@ class PostService {
     });
   }
 
-  /// 댓글 목록 실시간 스트림 (오래된 순)
   Stream<List<Comment>> watchComments(String postId) async* {
     final blockedUids = await BlockService.getBlockedUids();
     
@@ -265,7 +290,6 @@ class PostService {
             .toList());
   }
 
-  /// 댓글 삭제 (본인만)
   Future<void> deleteComment(String postId, String commentId) async {
     final uid = AuthService.instance.uid;
     if (uid == null) throw Exception('로그인이 필요해요');
@@ -287,10 +311,6 @@ class PostService {
   // 신고
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  /// 게시글 신고
-  /// 
-  /// 같은 게시글에 신고 3건 누적 시 자동으로 isReported=true 처리
-  /// (목록에서 자동 숨겨짐)
   Future<void> reportPost(String postId, String reason) async {
     final uid = AuthService.instance.uid;
     if (uid == null) throw Exception('로그인이 필요해요');
@@ -299,7 +319,6 @@ class PostService {
     if (trimmedReason.isEmpty) throw Exception('신고 사유를 입력해주세요');
     if (trimmedReason.length > 200) throw Exception('신고 사유는 200자 이내로 작성해주세요');
 
-    // 동일 사용자가 같은 게시글 중복 신고 방지
     final existing = await _reports
         .where('postId', isEqualTo: postId)
         .where('reporterUid', isEqualTo: uid)
@@ -310,7 +329,6 @@ class PostService {
       throw Exception('이미 신고한 게시글이에요');
     }
 
-    // 신고 기록
     await _reports.add({
       'postId': postId,
       'reporterUid': uid,
@@ -318,7 +336,6 @@ class PostService {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    // 같은 게시글 신고 3건 이상이면 자동 숨김
     final allReports = await _reports
         .where('postId', isEqualTo: postId)
         .get();

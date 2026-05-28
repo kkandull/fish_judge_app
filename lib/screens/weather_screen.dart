@@ -1,475 +1,845 @@
-import 'dart:async';
+// lib/screens/weather_screen.dart
+//
+// 부산 앞바다 상세 날씨 화면 - 이모지 최소화.
+// 만조/간조 아이콘만 유지 (의미 있음).
 
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
-
+import 'package:flutter/services.dart';
 import '../services/weather_service.dart';
+import '../widgets/weather_alert_banner.dart';
+
+const Color _kPrimary = Color(0xFF1976D2);
+const Color _kNavy = Color(0xFF1A1A2E);
+const Color _kBg = Color(0xFFF5F7FA);
+const Color _kSub = Color(0xFF6B7684);
+const Color _kBorder = Color(0xFFE8EAED);
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
+
   @override
   State<WeatherScreen> createState() => _WeatherScreenState();
 }
 
-class _WeatherScreenState extends State<WeatherScreen>
-    with TickerProviderStateMixin {
-  Future<WeatherData>? _weatherDataFuture;
-  StreamSubscription<Position>? _positionStream;
-
-  bool _isDangerZone = false;
-  String _currentDangerPlace = "";
-  bool _isDismissedManually = false;
-  bool _isRefreshing = false;
-
-  late AnimationController _blinkController;
-  late AnimationController _floatController;
-
-  final List<Map<String, dynamic>> dangerPoints = [
-    {'name': '해운대 마린시티', 'lat': 35.1587, 'lng': 129.1601},
-    {'name': '오륙도 방파제', 'lat': 35.1001, 'lng': 129.1226},
-    {'name': '영도 신방파제', 'lat': 35.0867, 'lng': 129.0778},
-    {'name': '영도 국립해양박물관 갯바위', 'lat': 35.0789, 'lng': 129.0801},
-    {'name': '암남공원 방파제', 'lat': 35.0634, 'lng': 129.0208},
-    {'name': '감천항 동방파제', 'lat': 35.0511, 'lng': 129.0089},
-    {'name': '기장 학리방파제', 'lat': 35.2580, 'lng': 129.2464},
-    {'name': '가덕도 대항방파제', 'lat': 35.0122, 'lng': 128.8273},
-  ];
+class _WeatherScreenState extends State<WeatherScreen> {
+  WeatherData? _weather;
+  bool _loading = true;
+  bool _refreshing = false;
 
   @override
   void initState() {
     super.initState();
-    _weatherDataFuture = WeatherService.instance.fetchAll();
-    _startLocationTracking();
-
-    _blinkController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    )..repeat(reverse: true);
-
-    _floatController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
+    _loadWeather();
   }
 
-  @override
-  void dispose() {
-    _positionStream?.cancel();
-    _blinkController.dispose();
-    _floatController.dispose();
-    super.dispose();
-  }
-
-  void _startLocationTracking() async {
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10,
-      ),
-    ).listen((Position position) {
-      bool foundDanger = false;
-      String placeName = "";
-
-      for (var point in dangerPoints) {
-        double distance = Geolocator.distanceBetween(
-          position.latitude,
-          position.longitude,
-          point['lat'],
-          point['lng'],
-        );
-        if (distance <= 100) {
-          foundDanger = true;
-          placeName = point['name'];
-          break;
-        }
-      }
-
-      if (foundDanger) {
-        if (_currentDangerPlace != placeName) {
-          setState(() {
-            _isDangerZone = true;
-            _currentDangerPlace = placeName;
-            _isDismissedManually = false;
-          });
-        }
-      } else {
-        if (_isDangerZone || _currentDangerPlace.isNotEmpty) {
-          setState(() {
-            _isDangerZone = false;
-            _currentDangerPlace = "";
-            _isDismissedManually = false;
-          });
-        }
-      }
-    });
-  }
-
-  Future<void> _handleRefresh() async {
-    final newData = await WeatherService.instance.fetchAll(forceRefresh: true);
-    if (mounted) {
-      setState(() {
-        _weatherDataFuture = Future.value(newData);
-      });
-    }
-  }
-
-  Future<void> _handleButtonRefresh() async {
-    if (_isRefreshing) return;
-    setState(() => _isRefreshing = true);
+  Future<void> _loadWeather({bool forceRefresh = false}) async {
+    if (forceRefresh) setState(() => _refreshing = true);
     try {
-      final newData =
-          await WeatherService.instance.fetchAll(forceRefresh: true);
+      final data = await WeatherService.instance.fetch(forceRefresh: forceRefresh);
       if (mounted) {
         setState(() {
-          _weatherDataFuture = Future.value(newData);
+          _weather = data;
+          _loading = false;
+          _refreshing = false;
         });
       }
-    } finally {
-      if (mounted) setState(() => _isRefreshing = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _refreshing = false;
+        });
+      }
     }
+  }
+
+  String _formatTime(DateTime dt) {
+    final amPm = dt.hour < 12 ? '오전' : '오후';
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    return '$amPm $hour:${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatUpdated(DateTime dt) {
+    return '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')} '
+        '${_formatTime(dt)}';
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<WeatherData>(
-      future: _weatherDataFuture,
-      builder: (context, snapshot) {
-        final isLoading = snapshot.connectionState == ConnectionState.waiting;
-
-        final data = snapshot.data ?? WeatherData.placeholder();
-
-        final amPm = data.updateTime.hour < 12 ? '오전' : '오후';
-        final hour = data.updateTime.hour > 12
-            ? data.updateTime.hour - 12
-            : (data.updateTime.hour == 0 ? 12 : data.updateTime.hour);
-        final timeStr =
-            "${data.updateTime.year}.${data.updateTime.month.toString().padLeft(2, '0')}.${data.updateTime.day.toString().padLeft(2, '0')} $amPm $hour:${data.updateTime.minute.toString().padLeft(2, '0')}";
-
-        return Scaffold(
-          backgroundColor: const Color(0xFFF9FAFC),
-          appBar: AppBar(
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '현재 바다 상황',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '업데이트: $timeStr',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
+    return Scaffold(
+      backgroundColor: _kBg,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: _kNavy),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '현재 바다 상황',
+              style: TextStyle(color: _kNavy, fontWeight: FontWeight.bold, fontSize: 17),
             ),
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black87,
-            elevation: 0,
-            actions: [
-              IconButton(
-                icon: _isRefreshing
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          color: Colors.blueAccent,
-                        ),
-                      )
-                    : const Icon(
-                        Icons.refresh_rounded,
-                        color: Colors.blueAccent,
-                      ),
-                tooltip: '날씨/수온 새로고침',
-                onPressed: _isRefreshing ? null : _handleButtonRefresh,
+            if (_weather != null)
+              Text(
+                '업데이트: ${_formatUpdated(_weather!.updatedAt)}',
+                style: const TextStyle(color: _kSub, fontSize: 11, fontWeight: FontWeight.normal),
               ),
-              IconButton(
-                icon: const Icon(Icons.bug_report, color: Colors.redAccent),
-                tooltip: 'UI 테스트용 강제 경고창',
-                onPressed: () {
-                  setState(() {
-                    _isDangerZone = true;
-                    _currentDangerPlace = "오륙도 방파제 (테스트)";
-                    _isDismissedManually = false;
-                  });
-                },
-              ),
-              const SizedBox(width: 8),
-            ],
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: _refreshing
+                ? const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary),
+                  )
+                : const Icon(Icons.refresh, color: _kPrimary),
+            onPressed: _refreshing ? null : () {
+              HapticFeedback.lightImpact();
+              _loadWeather(forceRefresh: true);
+            },
           ),
-          body: Stack(
-            children: [
-              RefreshIndicator(
-                onRefresh: _handleRefresh,
-                color: const Color(0xFF1976D2),
-                backgroundColor: Colors.white,
-                child: Positioned.fill(
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24.0,
-                      vertical: 20.0,
-                    ),
-                    child: AnimatedOpacity(
-                      opacity: (isLoading || _isRefreshing) ? 0.4 : 1.0,
-                      duration: const Duration(milliseconds: 300),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          if (data.isOffline)
-                            Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.orange.shade50,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.orange.shade200,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.wifi_off_rounded,
-                                    color: Colors.orange.shade700,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      "인터넷 연결이 끊겨 로컬 데이터를 표시합니다.",
-                                      style: TextStyle(
-                                        color: Colors.orange.shade900,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          _buildRecommendedFishSection(
-                            data.recommendedFish,
-                            data.updateTime.month,
-                          ),
-                          const SizedBox(height: 28),
-                          Row(
-                            children: const [
-                              Icon(
-                                Icons.location_on,
-                                color: Colors.redAccent,
-                                size: 20,
-                              ),
-                              SizedBox(width: 6),
-                              Text(
-                                '실시간 해양 데이터 (부산 앞바다)',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              _buildInfoCard(
-                                "기온",
-                                data.temperature,
-                                null,
-                                Icons.thermostat,
-                                const Color(0xFFFF8A65),
-                              ),
-                              const SizedBox(width: 14),
-                              _buildInfoCard(
-                                "풍속",
-                                data.windSpeed,
-                                data.windDirection,
-                                Icons.air,
-                                const Color(0xFF4DB6AC),
-                                windAngle: data.windAngle,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          Row(
-                            children: [
-                              _buildInfoCard(
-                                "파고",
-                                data.waveHeight,
-                                null,
-                                Icons.waves,
-                                const Color(0xFF7986CB),
-                              ),
-                              const SizedBox(width: 14),
-                              _buildInfoCard(
-                                "수온",
-                                data.waterTemp,
-                                null,
-                                Icons.water_drop,
-                                const Color(0xFF64B5F6),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 40),
-                        ],
-                      ),
-                    ),
+        ],
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _weather == null
+              ? _buildError()
+              : RefreshIndicator(
+                  onRefresh: () => _loadWeather(forceRefresh: true),
+                  color: _kPrimary,
+                  child: ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      // ⭐ 기상특보 (최상단)
+                      if (_weather!.alerts.isNotEmpty)
+                        WeatherAlertBanner(alerts: _weather!.alerts),
+                      _buildFishingScoreCard(_weather!.fishingScore),
+                      const SizedBox(height: 16),
+                      _buildTideCard(_weather!.tide),
+                      const SizedBox(height: 16),
+                      _buildSunMoonCard(_weather!.sunMoon),
+                      const SizedBox(height: 16),
+                      _buildOceanGrid(_weather!),
+                      const SizedBox(height: 16),
+                      _buildWeatherGrid(_weather!),
+                      if (_weather!.isUsingDummy) ...[
+                        const SizedBox(height: 16),
+                        _buildDummyDataNotice(),
+                      ],
+                      const SizedBox(height: 16),
+                      if (_weather!.fishingScore.score < 50)
+                        _buildSafetyWarning(_weather!),
+                    ],
                   ),
                 ),
-              ),
-              if (_isDangerZone && !_isDismissedManually)
-                GestureDetector(
-                  onTap: () => setState(() => _isDismissedManually = true),
-                  child: Container(
-                    color: Colors.red.withOpacity(0.2),
-                    child: Center(
-                      child: FadeTransition(
-                        opacity: _blinkController,
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 32),
-                          padding: const EdgeInsets.symmetric(
-                            vertical: 30,
-                            horizontal: 24,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.red.withOpacity(0.6),
-                                blurRadius: 30,
-                                spreadRadius: 5,
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.warning_amber_rounded,
-                                color: Colors.white,
-                                size: 60,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                "위험!\n현재 [$_currentDangerPlace]\n추락 위험 지역입니다!",
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                  height: 1.4,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                "(화면을 터치하면 닫힙니다)",
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
     );
   }
 
-  Widget _buildRecommendedFishSection(String text, int month) {
-    final List<TextSpan> spans = [];
-    final exp = RegExp(r'\*\*(.*?)\*\*');
-    int start = 0;
-
-    for (final m in exp.allMatches(text)) {
-      if (m.start > start) {
-        spans.add(TextSpan(text: text.substring(start, m.start)));
-      }
-      spans.add(
-        TextSpan(
-          text: m.group(1),
-          style: const TextStyle(
-            fontWeight: FontWeight.w900,
-            color: Color(0xFFFFD54F),
-            fontSize: 16,
-          ),
-        ),
-      );
-      start = m.end;
-    }
-    if (start < text.length) {
-      spans.add(TextSpan(text: text.substring(start)));
-    }
-
+  // ✅ 낚시 적합도 - 이모지 → 아이콘
+  Widget _buildFishingScoreCard(FishingScore score) {
+    final color = Color(int.parse(score.colorHex));
     
-
-
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF243046),
+        gradient: LinearGradient(
+          colors: [color, color.withOpacity(0.7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: color.withOpacity(0.3),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44, height: 44,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.25),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Icon(_getScoreIcon(score.score), color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                '오늘의 낚시 적합도',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '${score.score}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 56,
+                  fontWeight: FontWeight.w900,
+                  height: 1.0,
+                ),
+              ),
+              const Text(
+                ' / 100',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  score.grade,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: score.reasons.take(5).map((reason) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 4, height: 4,
+                      margin: const EdgeInsets.only(top: 8, right: 8),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        reason,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          height: 1.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getScoreIcon(int score) {
+    if (score >= 80) return Icons.check_circle;
+    if (score >= 60) return Icons.thumb_up;
+    if (score >= 40) return Icons.info_outline;
+    return Icons.warning_amber_rounded;
+  }
+
+  // ✅ 조석 카드 - 만조/간조는 의미 있는 아이콘만
+  Widget _buildTideCard(TideInfo tide) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.waves, color: _kPrimary, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                '오늘의 물때',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: _kNavy,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _kPrimary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  tide.mulTtae,
+                  style: const TextStyle(
+                    color: _kPrimary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          
+          if (tide.nextEvent != null) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: tide.nextEvent!.isHighTide
+                      ? [_kPrimary.withOpacity(0.15), _kPrimary.withOpacity(0.05)]
+                      : [Colors.orange.withOpacity(0.15), Colors.orange.withOpacity(0.05)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 50, height: 50,
+                    decoration: BoxDecoration(
+                      color: tide.nextEvent!.isHighTide ? _kPrimary : Colors.orange,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      tide.nextEvent!.isHighTide ? Icons.waves : Icons.beach_access,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '다음 ${tide.nextEvent!.label}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: _kSub,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _formatTime(tide.nextEvent!.time),
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            color: _kNavy,
+                          ),
+                        ),
+                        Text(
+                          '조위 ${tide.nextEvent!.levelCm.toStringAsFixed(0)}cm',
+                          style: const TextStyle(fontSize: 11, color: _kSub),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: tide.nextEvent!.isHighTide ? _kPrimary : Colors.orange,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      _untilLabel(tide.nextEvent!.time),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          
+          const Divider(color: _kBorder),
+          const SizedBox(height: 8),
+          ...tide.events.map((e) {
+            final isPast = e.time.isBefore(DateTime.now());
+            final eventColor = e.isHighTide ? _kPrimary : Colors.orange;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Row(
+                children: [
+                  Container(
+                    width: 28, height: 28,
+                    decoration: BoxDecoration(
+                      color: isPast ? Colors.grey.shade200 : eventColor.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      e.isHighTide ? Icons.waves : Icons.beach_access,
+                      size: 14,
+                      color: isPast ? Colors.grey : eventColor,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isPast ? Colors.grey[200] : eventColor.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      e.label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isPast ? Colors.grey : eventColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _formatTime(e.time),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isPast ? Colors.grey : _kNavy,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${e.levelCm.toStringAsFixed(0)}cm',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isPast ? Colors.grey : _kSub,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  String _untilLabel(DateTime target) {
+    final diff = target.difference(DateTime.now());
+    if (diff.isNegative) return '지남';
+    if (diff.inHours == 0) return '${diff.inMinutes}분 후';
+    if (diff.inHours < 24) return '${diff.inHours}시간 후';
+    return '내일';
+  }
+
+  // ✅ 일출/일몰/월령 - 아이콘
+  Widget _buildSunMoonCard(SunMoonInfo info) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Row(
         children: [
-          AnimatedBuilder(
-            animation: _floatController,
-            builder: (context, child) => Transform.translate(
-              offset: Offset(0, -6 * _floatController.value),
-              child: child,
+          Expanded(
+            child: _sunMoonItem(
+              Icons.wb_sunny,
+              '일출',
+              _formatTime(info.sunrise),
+              Colors.orange,
             ),
           ),
-          const SizedBox(width: 18),
+          Container(width: 1, height: 50, color: _kBorder),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "$month월 바다 추천",
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+            child: _sunMoonItem(
+              Icons.wb_twilight,
+              '일몰',
+              _formatTime(info.sunset),
+              Colors.deepOrange,
+            ),
+          ),
+          Container(width: 1, height: 50, color: _kBorder),
+          Expanded(
+            child: _sunMoonItem(
+              Icons.brightness_2,
+              '월령',
+              info.moonName,
+              Colors.indigo,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sunMoonItem(IconData icon, String label, String value, Color color) {
+    return Column(
+      children: [
+        Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.12),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: _kSub, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  // ✅ 해양 데이터 - 이모지 헤더 제거
+  Widget _buildOceanGrid(WeatherData data) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            '실시간 해양 데이터',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: _kNavy,
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _statCard(
+                icon: Icons.thermostat,
+                label: '수온',
+                value: '${data.waterTempC.toStringAsFixed(1)}°C',
+                color: Colors.cyan,
+                sub: _waterTempComment(data.waterTempC),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _statCard(
+                icon: Icons.waves,
+                label: '파고',
+                value: '${data.waveHeightM.toStringAsFixed(1)}m',
+                color: Colors.blue,
+                sub: _waveComment(data.waveHeightM),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  String _waterTempComment(double t) {
+    if (t < 10) return '저수온';
+    if (t < 14) return '쌀쌀';
+    if (t < 22) return '적정';
+    if (t < 26) return '따뜻';
+    return '고수온';
+  }
+
+  String _waveComment(double w) {
+    if (w < 0.5) return '잔잔';
+    if (w < 1.0) return '양호';
+    if (w < 1.5) return '주의';
+    return '위험';
+  }
+
+  // ✅ 기상 정보 - 이모지 헤더 제거
+  Widget _buildWeatherGrid(WeatherData data) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            '기상 정보',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: _kNavy,
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _statCard(
+                icon: Icons.thermostat,
+                label: '기온',
+                value: '${data.airTempC.toStringAsFixed(1)}°C',
+                color: Colors.orange,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _statCard(
+                icon: Icons.air,
+                label: '풍속',
+                value: '${data.windSpeedMs.toStringAsFixed(1)}m/s',
+                color: Colors.teal,
+                sub: data.windDirection,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: _statCard(
+                icon: Icons.umbrella,
+                label: '강수확률',
+                value: '${data.rainProbability}%',
+                color: data.rainProbability >= 40 ? Colors.indigo : Colors.green,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _statCard(
+                icon: _skyIcon(data.skyCondition),
+                label: '하늘',
+                value: data.skyCondition,
+                color: Colors.lightBlue,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  IconData _skyIcon(String sky) {
+    if (sky.contains('맑')) return Icons.wb_sunny;
+    if (sky.contains('구름')) return Icons.cloud_outlined;
+    if (sky.contains('흐')) return Icons.cloud;
+    if (sky.contains('비')) return Icons.umbrella;
+    if (sky.contains('눈')) return Icons.ac_unit;
+    return Icons.cloud_outlined;
+  }
+
+  // ✅ 통계 카드 - 이모지 → 아이콘
+  Widget _statCard({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    String? sub,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  shape: BoxShape.circle,
                 ),
-                const SizedBox(height: 6),
-                RichText(
-                  text: TextSpan(
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      height: 1.4,
-                    ),
-                    children: spans,
+                alignment: Alignment.center,
+                child: Icon(icon, color: color, size: 18),
+              ),
+              const Spacer(),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              color: _kSub,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: _kNavy,
+            ),
+          ),
+          if (sub != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              sub,
+              style: TextStyle(
+                fontSize: 11,
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 더미 데이터 사용 중 안내
+  Widget _buildDummyDataNotice() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.amber.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.amber.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 16, color: Colors.amber.shade800),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '현재 일부 데이터는 예시 값입니다. 베타 출시 후 실제 API 연동 예정.',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.amber.shade900,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSafetyWarning(WeatherData data) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.red.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.red.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.red.shade800, size: 22),
+              const SizedBox(width: 10),
+              Text(
+                '안전 안내',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red.shade900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            data.windSpeedMs >= 7
+                ? '강한 바람으로 인해 갯바위·방파제 낚시가 위험합니다.\n선상 출조는 자제해주세요.'
+                : data.waveHeightM >= 1.5
+                    ? '높은 파고로 인해 안전 사고 위험이 있습니다.\n갯바위 출조 자제, 안전 장비 필수.'
+                    : '오늘은 낚시 조건이 좋지 않습니다.\n다음 출조를 권장합니다.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.red.shade900,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.phone, size: 14, color: Colors.red),
+                SizedBox(width: 6),
+                Text(
+                  '해양 긴급: 122  /  소방: 119',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
                   ),
                 ),
               ],
@@ -480,79 +850,21 @@ class _WeatherScreenState extends State<WeatherScreen>
     );
   }
 
-  Widget _buildInfoCard(
-    String title,
-    String value,
-    String? subtitle,
-    IconData icon,
-    Color color, {
-    double windAngle = 0.0,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              spreadRadius: 2,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: title == "풍속"
-                  ? Transform.rotate(
-                      angle: (windAngle + 180) * 3.1415926535 / 180,
-                      child: Icon(
-                        Icons.navigation_rounded,
-                        color: color,
-                        size: 24,
-                      ),
-                    )
-                  : Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                color: Color(0xFF868E96),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 18,
-                color: Color(0xFF212529),
-              ),
-            ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12,
-                  color: color,
-                ),
-              ),
-            ],
-          ],
-        ),
+  Widget _buildError() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.cloud_off, size: 60, color: _kSub),
+          const SizedBox(height: 14),
+          const Text('날씨 정보를 가져올 수 없어요'),
+          const SizedBox(height: 14),
+          ElevatedButton(
+            onPressed: () => _loadWeather(forceRefresh: true),
+            style: ElevatedButton.styleFrom(backgroundColor: _kPrimary),
+            child: const Text('다시 시도', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }

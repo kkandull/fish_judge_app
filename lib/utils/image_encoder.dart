@@ -22,6 +22,16 @@ class ImageEncoder {
   static const int _thumbMaxDim = 240;
   static const int _thumbQuality = 70;
   
+  /// 게시글 작성 화면(post_compose_screen) 호환용 메소드
+  /// (기존 에러 해결을 위해 추가된 부분입니다)
+  static Future<({String thumbBase64, String fullBase64})> encodeForPost(File file) async {
+    final result = await encodeImage(file);
+    return (
+      thumbBase64: result['thumbnail']!,
+      fullBase64: result['full']!,
+    );
+  }
+
   /// 이미지 파일 → Base64 본 + 썸네일
   /// 
   /// 반환:

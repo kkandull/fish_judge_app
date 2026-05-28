@@ -9,6 +9,7 @@ import '../services/ai_services.dart';
 import '../services/regulation_service.dart';
 import 'measurement_screen.dart';
 import 'encyclopedia_screen.dart';
+import 'post_compose_screen.dart'; // ✅ Day 6 추가
 
 class AiScanScreen extends StatefulWidget {
   const AiScanScreen({super.key});
@@ -75,66 +76,55 @@ class _AiScanScreenState extends State<AiScanScreen> {
     }
   }
 
-  // ── [수정] 카메라 촬영 + 가이드라인 영역 크롭
+  // ── 카메라 촬영 + 가이드라인 영역 크롭
   Future<void> _takeAndAnalyzePhoto() async {
-  if (_isAnalyzing) return;
-  setState(() => _isAnalyzing = true);
-  try {
-    final photo = await _cameraController!.takePicture();
-
-    // 가이드라인 영역만 잘라서 모델에 넘김 (멀리 찍어도 물고기가 프레임을 채우게 함)
-    final croppedFile = await _cropToGuideline(File(photo.path));
-
-    final result = await _aiService.predict(croppedFile);
-    if (mounted) _showResultBottomSheet(result, croppedFile);
-  } catch (e) {
-    print("촬영/분석 에러: $e");
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('분석 중 오류가 발생했습니다. 다시 시도해주세요.')),
-      );
+    if (_isAnalyzing) return;
+    setState(() => _isAnalyzing = true);
+    try {
+      final photo = await _cameraController!.takePicture();
+      final croppedFile = await _cropToGuideline(File(photo.path));
+      final result = await _aiService.predict(croppedFile);
+      if (mounted) _showResultBottomSheet(result, croppedFile);
+    } catch (e) {
+      print("촬영/분석 에러: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('분석 중 오류가 발생했습니다. 다시 시도해주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isAnalyzing = false);
     }
-  } finally {
-    if (mounted) setState(() => _isAnalyzing = false);
-  }
   }
 
-  // ── [추가] 가이드라인 영역만 잘라내는 함수
-  /// 카메라로 찍은 원본 사진에서 화면의 파란 가이드라인 사각형에 해당하는
-  /// 부분(짧은 변 기준 정중앙 정사각형)만 잘라내 임시 파일로 저장.
   Future<File> _cropToGuideline(File originalPhoto) async {
-  final bytes = await originalPhoto.readAsBytes();
-  final decoded = img.decodeImage(bytes);
-  if (decoded == null) return originalPhoto;
+    final bytes = await originalPhoto.readAsBytes();
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return originalPhoto;
 
-  final oriented = img.bakeOrientation(decoded);
+    final oriented = img.bakeOrientation(decoded);
 
-  // 화면의 가이드라인은 280×280px이고, 일반적인 폰 화면 폭이 ~390px이므로
-  // 화면 폭의 약 72%를 차지함. 사진에서도 짧은 변의 ~72%만 자르면 됨.
-  // (CameraPreview가 BoxFit.cover로 화면을 채우는 표준 케이스 기준)
-  final shortSide = min(oriented.width, oriented.height);
-  final cropSize = (shortSide * 0.72).toInt();  // 0.95 → 0.72로 더 타이트하게
-  
-  final cx = (oriented.width  - cropSize) ~/ 2;
-  final cy = (oriented.height - cropSize) ~/ 2;
+    final shortSide = min(oriented.width, oriented.height);
+    final cropSize = (shortSide * 0.72).toInt();
+    
+    final cx = (oriented.width  - cropSize) ~/ 2;
+    final cy = (oriented.height - cropSize) ~/ 2;
 
-  final cropped = img.copyCrop(
-    oriented,
-    x: cx, y: cy,
-    width: cropSize, height: cropSize,
-  );
+    final cropped = img.copyCrop(
+      oriented,
+      x: cx, y: cy,
+      width: cropSize, height: cropSize,
+    );
 
-  final tmpDir = await getTemporaryDirectory();
-  final tmpPath = '${tmpDir.path}/cropped_${DateTime.now().millisecondsSinceEpoch}.jpg';
-  final tmpFile = File(tmpPath);
-  await tmpFile.writeAsBytes(img.encodeJpg(cropped, quality: 95));
+    final tmpDir = await getTemporaryDirectory();
+    final tmpPath = '${tmpDir.path}/cropped_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final tmpFile = File(tmpPath);
+    await tmpFile.writeAsBytes(img.encodeJpg(cropped, quality: 95));
 
-  return tmpFile;
+    return tmpFile;
   }
 
-  // ── [추가] 갤러리에서 사진 선택 후 분석 (디버그/검증 모드)
-  /// 갤러리에서 이미 잘 찍힌 사진을 골라 분석.
-  /// 크롭은 적용하지 않음 — 카메라 보정과 별개로 모델 자체 정확도를 검증할 때 사용.
+  // ── 갤러리에서 사진 선택 후 분석
   Future<void> _pickFromGalleryAndAnalyze() async {
     if (_isAnalyzing) return;
 
@@ -159,6 +149,19 @@ class _AiScanScreenState extends State<AiScanScreen> {
     } finally {
       if (mounted) setState(() => _isAnalyzing = false);
     }
+  }
+
+  // ✅ Day 6 추가: 커뮤니티에 질문 올리기
+  void _askCommunity(File image, String? guessedFishName) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PostComposeScreen(
+          prefilledFishName: guessedFishName,
+          prefilledImage: image,
+        ),
+      ),
+    );
   }
 
   // 🎨 튜토리얼 팝업 (기존 그대로)
@@ -235,7 +238,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
     );
   }
 
-  // ✨ 결과 바텀 시트 (Top-3 + 안전 경고 + 면책)
+  // ✨ 결과 바텀 시트 (Top-3 + 안전 경고 + 면책 + 커뮤니티 질문)
   void _showResultBottomSheet(AiPredictionResult result, File file) {
     final top = result.top;
     final isBackground = top.englishLabel == "5_background";
@@ -244,6 +247,12 @@ class _AiScanScreenState extends State<AiScanScreen> {
     final reg = showFishInfo ? _regulationService.getRegulationInfo(top.koreanName) : null;
     final isPro = reg != null && _checkIfProhibited(reg["금어기"]);
     final isIncomplete = reg != null && _regulationService.isRegulationIncomplete(reg);
+
+    // ✅ Day 6: 커뮤니티 질문 노출 조건
+    // - 신뢰도 낮을 때 (50% 미만 또는 isReliable=false)
+    // - background로 잘못 잡힌 게 아니어야 함
+    final showAskCommunity = !isBackground && 
+        (!result.isReliable || top.confidence < 0.6);
 
     showModalBottomSheet(
       context: context,
@@ -305,10 +314,10 @@ class _AiScanScreenState extends State<AiScanScreen> {
                 ),
               const SizedBox(height: 16),
 
-              // ─── 경고 메시지 (있는 경우)
+              // ─── 경고 메시지
               if (result.warningMessage != null) _buildWarningBox(result.warningMessage!),
 
-              // ─── 위험 어종 경고 (독침/독성)
+              // ─── 위험 어종 경고
               if (result.dangerMessage != null) ...[
                 const SizedBox(height: 10),
                 _buildDangerBox(result.dangerMessage!),
@@ -317,7 +326,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
               // ─── 인식 실패 시 촬영 가이드
               if (!showFishInfo) _buildRetryGuide(),
 
-              // ─── Top-3 후보 표시 (성공 시에만)
+              // ─── Top-3 후보 표시
               if (showFishInfo) ...[
                 const SizedBox(height: 12),
                 _buildTopCandidates(result.topCandidates),
@@ -382,12 +391,18 @@ class _AiScanScreenState extends State<AiScanScreen> {
                     label: const Text("내 도감에 저장",
                         style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
+                      backgroundColor: const Color(0xFF1976D2),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ),
               if (showFishInfo) const SizedBox(height: 10),
+
+              // ✅ Day 6 추가: 커뮤니티에 물어보기 (신뢰도 낮을 때)
+              if (showAskCommunity)
+                _buildAskCommunityCard(file, showFishInfo ? top.koreanName : null),
+
+              if (showAskCommunity) const SizedBox(height: 10),
 
               // ─── 닫기 버튼
               SizedBox(
@@ -406,7 +421,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
               ),
               const SizedBox(height: 12),
 
-              // ─── 면책 문구 (항상 표시)
+              // ─── 면책 문구
               _buildDisclaimer(),
 
               TextButton(
@@ -425,6 +440,71 @@ class _AiScanScreenState extends State<AiScanScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // ✅ Day 6 신규: 커뮤니티 질문 카드
+  Widget _buildAskCommunityCard(File file, String? guessedFish) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.orange.shade50, Colors.amber.shade50],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.help_outline, color: Colors.orange.shade700, size: 22),
+              const SizedBox(width: 8),
+              Text(
+                "확실하지 않아요?",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange.shade800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "커뮤니티의 다른 낚시인에게 물어볼 수 있어요.\n사진은 자동으로 첨부됩니다.",
+            style: TextStyle(fontSize: 12, height: 1.5, color: Color(0xFF6B7684)),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(context); // 바텀시트 닫기
+                _askCommunity(file, guessedFish);
+              },
+              icon: const Icon(Icons.forum, color: Colors.white, size: 18),
+              label: const Text("커뮤니티에 물어보기",
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange.shade600,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -545,7 +625,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
-                      color: idx == 0 ? Colors.teal : Colors.grey.shade300,
+                      color: idx == 0 ? const Color(0xFF1976D2) : Colors.grey.shade300,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Center(
@@ -568,7 +648,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
                   Text("$pct%",
                       style: TextStyle(
                         fontSize: 13,
-                        color: idx == 0 ? Colors.teal : Colors.grey.shade600,
+                        color: idx == 0 ? const Color(0xFF1976D2) : Colors.grey.shade600,
                         fontWeight: idx == 0 ? FontWeight.bold : FontWeight.normal,
                       )),
                 ],
@@ -796,7 +876,6 @@ class _AiScanScreenState extends State<AiScanScreen> {
               ],
             ),
           ),
-          // ── [수정] 하단 촬영 버튼 + 갤러리 버튼 (좌측에 추가)
           Positioned(
             bottom: 100,
             left: 0,
@@ -807,7 +886,6 @@ class _AiScanScreenState extends State<AiScanScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // ── 갤러리에서 선택 버튼 (디버그/검증용)
                       GestureDetector(
                         onTap: _pickFromGalleryAndAnalyze,
                         child: Container(
@@ -826,7 +904,6 @@ class _AiScanScreenState extends State<AiScanScreen> {
                         ),
                       ),
                       const SizedBox(width: 40),
-                      // ── 촬영 버튼 (기존 그대로)
                       GestureDetector(
                         onTap: _takeAndAnalyzePhoto,
                         child: Container(
@@ -846,7 +923,6 @@ class _AiScanScreenState extends State<AiScanScreen> {
                           ),
                         ),
                       ),
-                      // ── 우측 여백 균형용 (촬영 버튼이 화면 중앙에 오도록)
                       const SizedBox(width: 40 + 50),
                     ],
                   ),
