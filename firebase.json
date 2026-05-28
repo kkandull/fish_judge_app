@@ -1,1 +1,39 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"now-fishing-723a8","appId":"1:340302655045:android:b1f0568df7e5e80b93fd2c","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"now-fishing-723a8","configurations":{"android":"1:340302655045:android:b1f0568df7e5e80b93fd2c","ios":"1:340302655045:ios:a3126305c0173d3493fd2c","macos":"1:340302655045:ios:a3126305c0173d3493fd2c","web":"1:340302655045:web:4927ca0a9da0907593fd2c","windows":"1:340302655045:web:382230b3a8d552c193fd2c"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "now-fishing-723a8",
+          "appId": "1:340302655045:android:b1f0568df7e5e80b93fd2c",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "now-fishing-723a8",
+          "configurations": {
+            "android": "1:340302655045:android:b1f0568df7e5e80b93fd2c",
+            "ios": "1:340302655045:ios:a3126305c0173d3493fd2c",
+            "macos": "1:340302655045:ios:a3126305c0173d3493fd2c",
+            "web": "1:340302655045:web:4927ca0a9da0907593fd2c",
+            "windows": "1:340302655045:web:382230b3a8d552c193fd2c"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
+}
