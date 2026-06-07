@@ -1,145 +1,117 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-
-  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+	<dict>
+		<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
        앱 기본 정보
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-  <key>CFBundleDevelopmentRegion</key>
-  <string>ko_KR</string>
-
-  <key>CFBundleDisplayName</key>
-  <string>나우피싱</string>
-
-  <key>CFBundleExecutable</key>
-  <string>$(EXECUTABLE_NAME)</string>
-
-  <key>CFBundleIdentifier</key>
-  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-
-  <key>CFBundleInfoDictionaryVersion</key>
-  <string>6.0</string>
-
-  <key>CFBundleName</key>
-  <string>나우피싱</string>
-
-  <key>CFBundlePackageType</key>
-  <string>APPL</string>
-
-  <key>CFBundleShortVersionString</key>
-  <string>$(FLUTTER_BUILD_NAME)</string>
-
-  <key>CFBundleSignature</key>
-  <string>????</string>
-
-  <key>CFBundleVersion</key>
-  <string>$(FLUTTER_BUILD_NUMBER)</string>
-
-  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+		<key>CFBundleDevelopmentRegion</key>
+		<string>ko_KR</string>
+		<key>CFBundleDisplayName</key>
+		<string>나우피싱</string>
+		<key>CFBundleExecutable</key>
+		<string>$(EXECUTABLE_NAME)</string>
+		<key>CFBundleIdentifier</key>
+		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+		<key>CFBundleInfoDictionaryVersion</key>
+		<string>6.0</string>
+		<key>CFBundleName</key>
+		<string>나우피싱</string>
+		<key>CFBundlePackageType</key>
+		<string>APPL</string>
+		<key>CFBundleShortVersionString</key>
+		<string>$(FLUTTER_BUILD_NAME)</string>
+		<key>CFBundleSignature</key>
+		<string>????</string>
+		<key>CFBundleVersion</key>
+		<string>$(FLUTTER_BUILD_NUMBER)</string>
+		<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
        iOS 필수 설정
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-  <key>LSRequiresIPhoneOS</key>
-  <true/>
-
-  <key>UILaunchStoryboardName</key>
-  <string>LaunchScreen</string>
-
-  <key>UIMainStoryboardFile</key>
-  <string>Main</string>
-
-  <!-- 세로 모드 고정 (낚시 앱 특성상 권장) -->
-  <key>UISupportedInterfaceOrientations</key>
-  <array>
-    <string>UIInterfaceOrientationPortrait</string>
-    <string>UIInterfaceOrientationPortraitUpsideDown</string>
-  </array>
-
-  <key>UISupportedInterfaceOrientations~ipad</key>
-  <array>
-    <string>UIInterfaceOrientationPortrait</string>
-    <string>UIInterfaceOrientationPortraitUpsideDown</string>
-    <string>UIInterfaceOrientationLandscapeLeft</string>
-    <string>UIInterfaceOrientationLandscapeRight</string>
-  </array>
-
-  <!-- 상태바 -->
-  <key>UIViewControllerBasedStatusBarAppearance</key>
-  <false/>
-
-  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+		<key>LSRequiresIPhoneOS</key>
+		<true/>
+		<key>UILaunchStoryboardName</key>
+		<string>LaunchScreen</string>
+		<key>UIMainStoryboardFile</key>
+		<string>Main</string>
+		<!-- 세로 모드 고정 (낚시 앱 특성상 권장) -->
+		<key>UISupportedInterfaceOrientations</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		</array>
+		<key>UISupportedInterfaceOrientations~ipad</key>
+		<array>
+			<string>UIInterfaceOrientationPortrait</string>
+			<string>UIInterfaceOrientationPortraitUpsideDown</string>
+			<string>UIInterfaceOrientationLandscapeLeft</string>
+			<string>UIInterfaceOrientationLandscapeRight</string>
+		</array>
+		<!-- 상태바 -->
+		<key>UIViewControllerBasedStatusBarAppearance</key>
+		<false/>
+		<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
        🔑 권한 설명 (iOS는 반드시 한국어로 명시)
        앱 심사 시 이 문구가 검토됨 — 구체적으로 작성
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-
-  <!-- 카메라 -->
-  <key>NSCameraUsageDescription</key>
-  <string>AI 어종 판독을 위해 카메라를 사용합니다. 물고기 사진을 찍어 어종, 금어기, 독성 여부를 즉시 확인할 수 있습니다.</string>
-
-  <!-- 사진 라이브러리 읽기 -->
-  <key>NSPhotoLibraryUsageDescription</key>
-  <string>조과 기록에 사진을 첨부하거나 AI 판독을 위해 갤러리 접근이 필요합니다.</string>
-
-  <!-- 사진 라이브러리 저장 (iOS 14 미만) -->
-  <key>NSPhotoLibraryAddUsageDescription</key>
-  <string>조과 기록 이미지를 갤러리에 저장합니다.</string>
-
-  <!-- 위치 (앱 사용 중) -->
-  <key>NSLocationWhenInUseUsageDescription</key>
-  <string>현재 위치 기반으로 가장 가까운 낚시 포인트의 날씨와 조석 정보를 제공합니다. 조과 기록에 위치 정보를 저장할 수 있습니다.</string>
-
-  <!-- 위치 (항상) — 백그라운드 알림용 -->
-  <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-  <string>낚시 포인트 근처 날씨 변화 및 풍랑 특보 알림을 위해 위치 접근이 필요합니다.</string>
-
-  <!-- 마이크 (필요 시) -->
-  <key>NSMicrophoneUsageDescription</key>
-  <string>음성으로 조과 메모를 작성할 때 마이크를 사용합니다.</string>
-
-  <!-- 네트워크 (HTTP 허용 — 공공데이터포털이 HTTP 사용) -->
-  <key>NSAppTransportSecurity</key>
-  <dict>
-    <!-- 공공데이터포털(apis.data.go.kr) HTTP 허용 -->
-    <key>NSExceptionDomains</key>
-    <dict>
-      <key>apis.data.go.kr</key>
-      <dict>
-        <key>NSExceptionAllowsInsecureHTTPLoads</key>
-        <true/>
-        <key>NSIncludesSubdomains</key>
-        <true/>
-      </dict>
-      <!-- 지도 타일 서버 (vworld) -->
-      <key>api.vworld.kr</key>
-      <dict>
-        <key>NSExceptionAllowsInsecureHTTPLoads</key>
-        <true/>
-        <key>NSIncludesSubdomains</key>
-        <true/>
-      </dict>
-    </dict>
-  </dict>
-
-  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+		<!-- 카메라 -->
+		<key>NSCameraUsageDescription</key>
+		<string>AI 어종 판독을 위해 카메라를 사용합니다. 물고기 사진을 찍어 어종, 금어기, 독성 여부를 즉시 확인할 수 있습니다.</string>
+		<!-- 사진 라이브러리 읽기 -->
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>조과 기록에 사진을 첨부하거나 AI 판독을 위해 갤러리 접근이 필요합니다.</string>
+		<!-- 사진 라이브러리 저장 (iOS 14 미만) -->
+		<key>NSPhotoLibraryAddUsageDescription</key>
+		<string>조과 기록 이미지를 갤러리에 저장합니다.</string>
+		<!-- 위치 (앱 사용 중) -->
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>현재 위치 기반으로 가장 가까운 낚시 포인트의 날씨와 조석 정보를 제공합니다. 조과 기록에 위치 정보를 저장할 수 있습니다.</string>
+		<!-- 위치 (항상) — 백그라운드 알림용 -->
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>낚시 포인트 근처 날씨 변화 및 풍랑 특보 알림을 위해 위치 접근이 필요합니다.</string>
+		<!-- 마이크 (필요 시) -->
+		<key>NSMicrophoneUsageDescription</key>
+		<string>음성으로 조과 메모를 작성할 때 마이크를 사용합니다.</string>
+		<!-- 네트워크 (HTTP 허용 — 공공데이터포털이 HTTP 사용) -->
+		<key>NSAppTransportSecurity</key>
+		<dict>
+			<!-- 공공데이터포털(apis.data.go.kr) HTTP 허용 -->
+			<key>NSExceptionDomains</key>
+			<dict>
+				<key>apis.data.go.kr</key>
+				<dict>
+					<key>NSExceptionAllowsInsecureHTTPLoads</key>
+					<true/>
+					<key>NSIncludesSubdomains</key>
+					<true/>
+				</dict>
+				<!-- 지도 타일 서버 (vworld) -->
+				<key>api.vworld.kr</key>
+				<dict>
+					<key>NSExceptionAllowsInsecureHTTPLoads</key>
+					<true/>
+					<key>NSIncludesSubdomains</key>
+					<true/>
+				</dict>
+			</dict>
+		</dict>
+		<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
        Flutter 설정
   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-  <key>CADisableMinimumFrameDurationOnPhone</key>
-  <true/>
-
-  <key>UIApplicationSupportsIndirectInputEvents</key>
-  <true/>
-
-  <!-- FCM 푸시 알림 -->
-  <key>FirebaseAppDelegateProxyEnabled</key>
-  <false/>
-
-  <!-- 백그라운드 모드 (푸시 알림) -->
-  <key>UIBackgroundModes</key>
-  <array>
-    <string>fetch</string>
-    <string>remote-notification</string>
-  </array>
-
-</dict>
+		<key>CADisableMinimumFrameDurationOnPhone</key>
+		<true/>
+		<key>UIApplicationSupportsIndirectInputEvents</key>
+		<true/>
+		<!-- FCM 푸시 알림 -->
+		<key>FirebaseAppDelegateProxyEnabled</key>
+		<false/>
+		<!-- 백그라운드 모드 (푸시 알림) -->
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>fetch</string>
+			<string>remote-notification</string>
+		</array>
+		<key>UIStatusBarHidden</key>
+		<false/>
+	</dict>
 </plist>

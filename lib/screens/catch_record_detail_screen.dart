@@ -264,27 +264,47 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
     await ShareService.copy(_generated);
     HapticFeedback.mediumImpact();
     setState(() => _copied = true);
-    Future.delayed(const Duration(seconds: 2), () { if (mounted) setState(() => _copied = false); });
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _copied = false);
+    });
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Row(children: [Icon(Icons.check_circle, color: Colors.white, size: 16), SizedBox(width: 8), Text('복사됐어요')]),
-        backgroundColor: _kGreen, behavior: SnackBarBehavior.floating, duration: Duration(seconds: 2),
+        content: Row(children: [
+          Icon(Icons.check_circle, color: Colors.white, size: 16),
+          SizedBox(width: 8),
+          Text('복사됐어요'),
+        ]),
+        backgroundColor: _kGreen,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
       ),
     );
   }
 
-  Future<void> _share() => ShareService.share(_generated);
+  Future<void> _share() async {
+    await ShareService.shareRecordAsCard(
+      context,
+      record: _record,
+      fallbackText: _generated,
+    );
+  }
 
   void _shareToApp() {
     if (!_record.hasPhoto) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('사진이 있는 기록만 커뮤니티에 공유할 수 있어요'), behavior: SnackBarBehavior.floating),
+        const SnackBar(
+          content: Text('사진이 있는 기록만 커뮤니티에 공유할 수 있어요'),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       return;
     }
     Navigator.push(context, MaterialPageRoute(
-      builder: (_) => PostComposeScreen(prefilledFishName: _record.fishName, prefilledImage: File(_record.imagePath!)),
+      builder: (_) => PostComposeScreen(
+        prefilledFishName: _record.fishName,
+        prefilledImage: File(_record.imagePath!),
+      ),
     ));
   }
 

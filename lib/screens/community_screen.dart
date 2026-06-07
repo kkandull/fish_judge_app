@@ -56,6 +56,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
   // ✅ 마지막으로 받은 포스트 목록 캐시 — 새로고침 중에도 기존 목록 유지
   List<CommunityPost> _cachedPosts = [];
+  bool _hasFetched = false;  // 첫 fetch 완료 여부 (빈 목록도 포함)
   bool _isRefreshing = false;
 
   @override
@@ -208,7 +209,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
     HapticFeedback.lightImpact();
     if (mounted) setState(() => _isRefreshing = true);
     setState(() => _refreshTrigger++);
-    // 스트림이 새 데이터를 emit할 때까지 잠시 대기
     await Future.delayed(const Duration(milliseconds: 800));
     if (mounted) setState(() => _isRefreshing = false);
   }
@@ -273,7 +273,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         refreshTrigger: _refreshTrigger,
                       ),
                       builder: (context, snap) {
-                        // ✅ 에러 처리
                         if (snap.hasError) {
                           if (ConnectivityService.instance.isOffline) {
                             return ListView(
@@ -297,14 +296,15 @@ class _CommunityScreenState extends State<CommunityScreen> {
                           );
                         }
 
-                        // ✅ 새 데이터가 오면 캐시 갱신
+                        // ✅ 새 데이터가 오면 캐시 갱신 + 첫 fetch 완료 표시
                         if (snap.hasData) {
                           _cachedPosts = snap.data!;
+                          _hasFetched = true;
                         }
 
-                        // ✅ 첫 로딩(캐시 없음)일 때만 로딩 UI 표시
-                        // 새로고침 중에는 _cachedPosts가 있으므로 기존 목록 유지
-                        if (_cachedPosts.isEmpty &&
+                        // ✅ 한 번도 fetch 안 됐을 때만 로딩 UI
+                        // _hasFetched = true면 빈 목록이어도 스켈레톤 안 보여줌
+                        if (!_hasFetched &&
                             snap.connectionState == ConnectionState.waiting) {
                           return _buildLoadingList();
                         }

@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# 릴리즈 서명 키 (절대 GitHub에 올리면 안 됨)
+*.jks
+*.keystore

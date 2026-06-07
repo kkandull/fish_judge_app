@@ -204,7 +204,7 @@ class _CatchPostScreenState extends State<CatchPostScreen> {
   }
 
   // ── 커뮤니티 ────────────────────────────────────────
-  void _shareToApp() {
+  Future<void> _shareToApp() async {
     if (!widget.record.hasPhoto) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -214,10 +214,28 @@ class _CatchPostScreenState extends State<CatchPostScreen> {
       );
       return;
     }
+    // ✅ 파일 존재 확인
+    final imageFile = File(widget.record.imagePath!);
+    final exists = await imageFile.exists();
+    if (!mounted) return;
+    if (!exists) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('사진 파일을 찾을 수 없어요. 직접 선택해주세요.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => PostComposeScreen(
+          prefilledFishName: widget.record.fishName,
+        ),
+      ));
+      return;
+    }
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => PostComposeScreen(
         prefilledFishName: widget.record.fishName,
-        prefilledImage: File(widget.record.imagePath!),
+        prefilledImage: imageFile,
       ),
     ));
   }
