@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/unified_catch_record.dart';
+import 'dart:async';
 import '../services/catch_record_repository.dart';
 
 const Color _kBlue   = Color(0xFF1976D2);
@@ -21,11 +22,22 @@ class FishingStatsDashboard extends StatefulWidget {
 
 class _FishingStatsDashboardState extends State<FishingStatsDashboard> {
   _Stats? _stats;
+  StreamSubscription<void>? _changeSub;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // ⭐ 조과 기록 변경 시 자동 갱신
+    _changeSub = CatchRecordRepository.instance.changes.listen((_) {
+      if (mounted) _load();
+    });
+  }
+
+  @override
+  void dispose() {
+    _changeSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {

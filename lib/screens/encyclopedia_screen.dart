@@ -15,6 +15,8 @@ import '../models/unified_catch_record.dart';
 import '../services/catch_record_repository.dart';
 import '../widgets/unified_catch_form.dart';
 import '../widgets/fishing_stats_dashboard.dart';
+import '../services/gemini_service.dart';
+import '../services/weather_service.dart';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 디자인 토큰
@@ -53,8 +55,8 @@ List<Color> _fishGradient(String name) =>
 // 어종별 대표 실루엣 이모지 매핑 (더 다양하게)
 const Map<String, String> _kFishEmoji = {
   '감성돔': '🐟', '참돔': '🐟', '벵에돔': '🐟', '노래미': '🐟',
-  '우럭': '🐟', '볼락': '🐟', '광어': '🐟', '도다리': '🐟',
-  '독가시치': '🐟', '전갱이': '🐟', '고등어': '🐟', '삼치': '🐟',
+  '쥐노래미': '🐟', '우럭': '🐟', '볼락': '🐟', '광어': '🐟',
+  '도다리': '🐟', '독가시치': '🐟', '전갱이': '🐟', '고등어': '🐟', '삼치': '🐟',
 };
 
 const List<Map<String, dynamic>> kCommonGear = [
@@ -104,6 +106,11 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
   bool _isLoading = true;
   bool _isGridView = true;
   late AnimationController _fadeCtrl;
+  String? _patternInsight;      // Gemini 패턴 분석 결과
+  bool _insightLoading = false; // 분석 중 상태
+  String? _insightError;        // 에러 메시지
+  static const _kInsightDateKey    = 'insight_last_date';
+  static const _kInsightCacheKey   = 'insight_cached_text';
 
   List<String> get allFishNames =>
       [...CatchRecordRepository.defaultFishNames, ...customFishNames];
@@ -154,6 +161,62 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
     if (mounted) {
       setState(() => _isLoading = false);
       _fadeCtrl.forward(from: 0);
+      // 조과 기록 3개 이상이면 Gemini 패턴 분석 시작
+      final allRecords = recordMap.values.expand((e) => e).toList();
+      if (allRecords.length >= 3) _loadOrFetchInsight(allRecords);
+    }
+  }
+
+  // 오늘 캐시 있으면 바로 표시, 없으면 Gemini 호출
+  Future<void> _loadOrFetchInsight(List<UnifiedCatchRecord> records) async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toIso8601String().substring(0, 10); // 'yyyy-MM-dd'
+    final savedDate = prefs.getString(_kInsightDateKey) ?? '';
+    final cachedText = prefs.getString(_kInsightCacheKey) ?? '';
+
+    if (savedDate == today && cachedText.isNotEmpty) {
+      // 오늘 이미 분석한 결과 → 캐시에서 바로 표시
+      debugPrint('[Insight] 오늘 캐시 사용: $cachedText');
+      if (mounted) setState(() => _patternInsight = cachedText);
+      return;
+    }
+
+    // 오늘 아직 분석 안 했거나 캐시 없음 → Gemini 호출
+    await _fetchPatternInsight(records);
+  }
+
+  Future<void> _fetchPatternInsight(List<UnifiedCatchRecord> records) async {
+    if (!GeminiService.instance.isAvailable) return;
+    if (!mounted) return;
+    setState(() => _insightLoading = true);
+
+    final weather = WeatherService.instance.cachedData;
+    final insight = await GeminiService.instance.getPatternInsight(
+      records: records,
+      currentWaterTemp: weather?.waterTempC,
+      currentMonth: DateTime.now().month,
+    );
+
+    if (mounted) {
+      // await는 setState 밖에서
+      final isQuota = insight == '__quota__';
+
+      // 성공 시 캐시 저장 (setState 전에 처리)
+      if (insight != null && !isQuota) {
+        final prefs = await SharedPreferences.getInstance();
+        final today = DateTime.now().toIso8601String().substring(0, 10);
+        await prefs.setString(_kInsightDateKey, today);
+        await prefs.setString(_kInsightCacheKey, insight);
+        debugPrint('[Insight] 오늘 날짜로 캐시 저장 완료');
+      }
+
+      setState(() {
+        _patternInsight = isQuota ? null : insight;
+        _insightLoading = false;
+        _insightError = isQuota
+            ? '요청이 많아요. 내일 다시 확인해주세요 📅'
+            : insight == null ? '분석 중 오류가 발생했어요' : null;
+      });
     }
   }
 
@@ -255,6 +318,7 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
     final colors = _fishGradient(record.fishName);
     showDialog(
       context: context,
+      barrierDismissible: true,
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         backgroundColor: Colors.white,
@@ -385,15 +449,27 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
   String _weightLabel(double g) => g >= 1000
       ? '${(g/1000).toStringAsFixed(2)} kg' : '${g.toStringAsFixed(0)} g';
 
-  void _shareToCommunity(UnifiedCatchRecord record) {
+  Future<void> _shareToCommunity(UnifiedCatchRecord record) async {
     if (!record.hasPhoto) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('사진이 있는 기록만 커뮤니티에 공유할 수 있어요'),
             behavior: SnackBarBehavior.floating));
       return;
     }
+    // ✅ 파일 존재 여부 확인
+    final imageFile = File(record.imagePath!);
+    final exists = await imageFile.exists();
+    if (!mounted) return;
+    if (!exists) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('사진 파일을 찾을 수 없어요. 갤러리에서 직접 선택해주세요.'),
+          behavior: SnackBarBehavior.floating));
+      Navigator.push(context, MaterialPageRoute(builder: (_) => const PostComposeScreen()));
+      return;
+    }
     Navigator.push(context, MaterialPageRoute(builder: (_) => PostComposeScreen(
-      prefilledFishName: record.fishName, prefilledImage: File(record.imagePath!))));
+      prefilledFishName: record.fishName, prefilledImage: imageFile)));
   }
 
   Future<void> _showEditMemoDialog(UnifiedCatchRecord record) async {
@@ -580,6 +656,9 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
                 const FishingStatsDashboard(),
                 const SizedBox(height: 12),
                 _buildGearShopButton(),
+                const SizedBox(height: 12),
+                // ⭐ Gemini 낚시 패턴 분석 카드
+                _buildPatternInsightCard(),
                 const SizedBox(height: 20),
                 // 섹션 헤더
                 Row(children: [
@@ -595,7 +674,29 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
                   const SizedBox(width: 10),
                   const Text('어종 도감', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: _kNavy)),
                 ]),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
+                // ⭐ 7번: 처음 방문 안내 (0종일 때만)
+                if (collected == 0) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _kBlue.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: _kBlue.withOpacity(0.15)),
+                    ),
+                    child: Row(children: [
+                      Icon(Icons.info_outline, size: 14, color: _kBlue.withOpacity(0.7)),
+                      const SizedBox(width: 8),
+                      const Expanded(child: Text(
+                        'AI 판독으로 물고기를 찍으면 자동으로 도감이 채워져요 📷',
+                        style: TextStyle(
+                          fontSize: 11, color: _kBlue, height: 1.4, fontWeight: FontWeight.w500))),
+                    ]),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+
               ])),
             ),
             SliverPadding(
@@ -641,34 +742,169 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
     );
   }
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ⭐ C. Gemini 낚시 패턴 분석 카드
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Widget _buildPatternInsightCard() {
+    final allRecords = recordMap.values.expand((e) => e).toList();
+    final hasEnough = allRecords.length >= 3;
+    final isGeminiOff = !GeminiService.instance.isAvailable;
+
+    // Gemini 비활성화 상태면 카드 숨김
+    if (isGeminiOff) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [const Color(0xFF0D1B2A), const Color(0xFF1A3A5C)],
+          begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(
+          color: const Color(0xFF0D1B2A).withOpacity(0.3),
+          blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+        // 헤더
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1976D2),
+              borderRadius: BorderRadius.circular(6)),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Text('✨', style: TextStyle(fontSize: 10)),
+              SizedBox(width: 3),
+              Text('AI 낚시 패턴 분석',
+                style: TextStyle(
+                  color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
+            ]),
+          ),
+          const Spacer(),
+          if (hasEnough && !_insightLoading)
+            GestureDetector(
+              onTap: () async {
+                // 캐시 초기화 후 재호출 (하루 1회 제한 무시하고 강제 갱신)
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove(_kInsightDateKey);
+                await prefs.remove(_kInsightCacheKey);
+                setState(() {
+                  _patternInsight = null;
+                  _insightLoading = false;
+                  _insightError = null;
+                });
+                _fetchPatternInsight(allRecords);
+              },
+              child: Icon(Icons.refresh_rounded,
+                color: Colors.white.withOpacity(0.5), size: 18)),
+          if (hasEnough && _insightLoading)
+            SizedBox(
+              width: 16, height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: Colors.white.withOpacity(0.4))),
+        ]),
+        const SizedBox(height: 12),
+
+        // 내용 분기
+        if (!hasEnough) ...[
+          // 기록 부족
+          Row(children: [
+            Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                shape: BoxShape.circle),
+              alignment: Alignment.center,
+              child: const Text('🎣', style: TextStyle(fontSize: 18))),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('조과 기록을 더 쌓아보세요',
+                style: TextStyle(
+                  color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 3),
+              Text('기록 ${allRecords.length}개 / 3개 이상이면 AI가 패턴을 분석해드려요',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.55), fontSize: 11, height: 1.4)),
+            ])),
+          ]),
+          const SizedBox(height: 10),
+          // 진행 바
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: allRecords.length / 3,
+              backgroundColor: Colors.white.withOpacity(0.1),
+              color: const Color(0xFF42A5F5),
+              minHeight: 4,
+            ),
+          ),
+        ] else if (_insightLoading) ...[
+          // 분석 중
+          Row(children: [
+            SizedBox(
+              width: 16, height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.8,
+                color: Colors.white.withOpacity(0.6))),
+            const SizedBox(width: 10),
+            Text('AI가 낚시 패턴을 분석 중이에요...',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6), fontSize: 13)),
+          ]),
+        ] else if (_patternInsight != null) ...[
+          // 분석 결과
+          Text(_patternInsight!,
+            style: const TextStyle(
+              color: Colors.white, fontSize: 13,
+              height: 1.65, fontWeight: FontWeight.w400)),
+        ] else ...[
+          // Gemini 응답 없음 (오류)
+          Row(children: [
+            Icon(Icons.info_outline, size: 13,
+              color: Colors.white.withOpacity(0.4)),
+            const SizedBox(width: 6),
+            Expanded(child: Text(
+              _insightError ?? '분석을 불러올 수 없어요',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.5), fontSize: 12))),
+          ]),
+        ],
+
+      ]),
+    );
+  }
+
   Widget _buildGearShopButton() {
     return GestureDetector(
       onTap: _openGearShop,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [_kNavy, const Color(0xFF1B4F72)],
-            begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: _kNavy.withOpacity(0.25), blurRadius: 12, offset: const Offset(0,4))],
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE8EAED)),
+          boxShadow: [BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: Row(children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12)),
-            alignment: Alignment.center,
-            child: const Text('🛠️', style: TextStyle(fontSize: 22)),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('장비 추천 보기', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Colors.white)),
-            SizedBox(height: 2),
-            Text('낚시 입문자를 위한 필수 장비 3종', style: TextStyle(fontSize: 11, color: Colors.white60)),
-          ])),
-          Icon(Icons.arrow_forward_ios, size: 13, color: Colors.white.withOpacity(0.6)),
+          const Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('장비 추천 보기',
+                style: TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w800,
+                  color: Color(0xFF212529))),
+              SizedBox(height: 3),
+              Text('낚시 입문자를 위한 필수 장비 3종',
+                style: TextStyle(fontSize: 12, color: Color(0xFF868E96))),
+            ],
+          )),
+          const Icon(Icons.chevron_right, size: 18, color: Color(0xFF868E96)),
         ]),
       ),
     );

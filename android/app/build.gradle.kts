@@ -6,14 +6,13 @@ plugins {
 }
 
 android {
-    namespace = "com.example.busan_fush_app"
-    compileSdk = flutter.compileSdkVersion
+    namespace = "com.nowfishing.app"
+    compileSdk = 36       // ✅ 1-1: API 35로 고정
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        // 🚨 1. KTS 문법: is...Enabled = true 형태로 작성
         isCoreLibraryDesugaringEnabled = true
     }
 
@@ -22,16 +21,35 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.busan_fush_app"
+        applicationId = "com.nowfishing.app"
         minSdk = 26
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36      // ✅ 1-1: API 35 타겟
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("nowfishing.jks")
+            storePassword = "59suxr12@"
+            keyAlias = "nowfishing"
+            keyPassword = "59suxr12@"
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+            // ✅ 1-4: ProGuard/R8 난독화 + 리소스 축소
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        debug {
+            isMinifyEnabled = false
         }
     }
 }

@@ -1,7 +1,7 @@
 name: busan_fish_app
 description: A new Flutter project for Busan Smart Fishing.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.11.0 <4.0.0'
@@ -12,16 +12,14 @@ dependencies:
   cupertino_icons: ^1.0.6
   flutter_launcher_icons: ^0.14.1
   
-  # [조장님 담당] AI 모델 및 카메라 계측 관련 패키지
   tflite_flutter: ^0.12.1
   image: ^4.8.0
   camera: ^0.11.0
   image_picker: ^1.2.2
 
-  # ✨ [새로 추가된 패키지] 팀원들 기능 구현용 ✨
-  http: ^1.6.0             # [표재국 담당] 기상청/바다타임 API 통신용
-  url_launcher: ^6.2.6     # [강태한/김승연 담당] 쿠팡 장비 추천 및 주변 편의시설 지도 링크 연결용
-  geolocator: ^11.0.1      # [표재국 담당] 위치 기반 사고 위험(테트라포드 등) 안내용 GPS 패키지
+  http: ^1.6.0
+  url_launcher: ^6.2.6
+  geolocator: ^11.0.1
   shared_preferences: ^2.5.5
   path_provider: ^2.1.5
   path: ^1.9.0
@@ -36,12 +34,15 @@ dependencies:
   firebase_messaging: ^15.1.0
   flutter_local_notifications: ^21.0.0
   connectivity_plus: ^7.1.1
+  google_generative_ai: ^0.4.6
+  firebase_remote_config: ^5.1.0
+  flutter_native_splash: ^2.4.0   # ✅ dependencies로 이동 (runtime 제거용)
+  geocoding: ^3.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  flutter_native_splash: ^2.4.0   # ✅ 추가: 스플래시 배경 제거용
 
 flutter:
   uses-material-design: true
@@ -52,20 +53,20 @@ flutter:
     - assets/fish_rules.json
     - assets/ic_launcher_foreground.png
     - assets/ic_launcher_background.png
+    - assets/models/fishing_score_model.tflite
+    - assets/fishing_norm_params.json
+    - assets/app_icon.png
+    - assets/splash_icon.png
 
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/app_icon.png"          # iOS용
+  image_path: "assets/app_icon.png"
   remove_alpha_ios: true
-  adaptive_icon_background: "assets/ic_launcher_background.png"   # 파란 배경
-  adaptive_icon_foreground: "assets/ic_launcher_foreground.png"   # 아이콘
+  adaptive_icon_background: "assets/ic_launcher_background.png"
+  adaptive_icon_foreground: "assets/ic_launcher_foreground.png"
 
+# ✅ 네이티브 스플래시: 흰 배경만, 아이콘 없음 → 거의 안 보임
 flutter_native_splash:
-  color: "#ffffff"                        # 배경 흰색
-  image: assets/splash_icon.png          # 둥근 아이콘 이미지
-  fullscreen: true
-  android_12:
-    color: "#ffffff"
-    image: assets/splash_icon.png
-    icon_background_color: "#ffffff"
+  color: "#ffffff"
+  fullscreen: false         # ✅ true 제거 → 상태바 깜빡임 방지

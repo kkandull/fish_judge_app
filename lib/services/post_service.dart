@@ -62,7 +62,7 @@ class PostService {
     String? linkedFishName,
     List<String> imageBase64Thumbs = const [],
     List<String> imageBase64Fulls = const [],
-    String category = 'catch', // ✅ 추가
+    String category = 'catch',
     List<String> tags = const [],
   }) async {
     final uid = AuthService.instance.uid;
@@ -111,12 +111,13 @@ class PostService {
   /// [searchKeyword]: 제목/본문/닉네임/어종에서 매칭
   /// [sort]: 최신순/인기순/댓글많은순
   /// [category]: 전체/조과/질문/정보/내글
+  /// [refreshTrigger]: bump하면 스트림을 끊지 않고 재구독 유도 (깜빡임 방지)
   Stream<List<CommunityPost>> watchPosts({
     int limit = 50,
     String searchKeyword = '',
     PostSortOption sort = PostSortOption.latest,
     PostCategory category = PostCategory.all,
-    int refreshTrigger = 0,
+    int refreshTrigger = 0, // ✅ 커뮤니티 깜빡임 방지용
   }) async* {
     final blockedUids = await BlockService.getBlockedUids();
     final myUid = AuthService.instance.uid;
@@ -124,7 +125,7 @@ class PostService {
 
     yield* _posts
         .orderBy('createdAt', descending: true)
-        .limit(limit * 3) // 필터 후 줄어드는 거 대비
+        .limit(limit * 3)
         .snapshots()
         .map((snap) {
           var posts = snap.docs.map(CommunityPost.fromDoc).toList();
@@ -153,7 +154,6 @@ class PostService {
           // 5. 정렬
           switch (sort) {
             case PostSortOption.latest:
-              // 이미 createdAt 내림차순
               break;
             case PostSortOption.popular:
               posts.sort((a, b) {

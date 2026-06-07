@@ -312,6 +312,7 @@ class CatchRecordRepository {
     if (fishName.trim().isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
     await _registerFishIfNew(prefs, fishName);
+    _changeController.add(null); // ✅ 도감 UI 즉시 갱신 트리거
   }
 
   /// 새 어종이면 자동 등록 (지도에서 어종 기록 시 호출)

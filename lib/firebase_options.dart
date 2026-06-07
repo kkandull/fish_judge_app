@@ -4,16 +4,6 @@ import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
     show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
-/// Default [FirebaseOptions] for use with your Firebase apps.
-///
-/// Example:
-/// ```dart
-/// import 'firebase_options.dart';
-/// // ...
-/// await Firebase.initializeApp(
-///   options: DefaultFirebaseOptions.currentPlatform,
-/// );
-/// ```
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -40,6 +30,16 @@ class DefaultFirebaseOptions {
     }
   }
 
+  // ✅ Android — 새 프로젝트 (now-fishing-final, com.nowfishing.app)
+
+  static const FirebaseOptions android = FirebaseOptions(
+    apiKey: 'AIzaSyDR6ijml0quYCfl61eV6K3rLnq-9v0dLSA',
+    appId: '1:948326605122:android:ccd6e3cdd27a8ef12768db',
+    messagingSenderId: '948326605122',
+    projectId: 'now-fishing-final',
+    storageBucket: 'now-fishing-final.firebasestorage.app',
+  );
+  // 아래는 기존 프로젝트 설정 유지 (iOS/Web 미사용)
   static const FirebaseOptions web = FirebaseOptions(
     apiKey: 'AIzaSyDdibOuJI26FdvJOkCQY_c6RkoxhdiP5pM',
     appId: '1:340302655045:web:4927ca0a9da0907593fd2c',
@@ -50,23 +50,14 @@ class DefaultFirebaseOptions {
     measurementId: 'G-KLCGNY2XZP',
   );
 
-  static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyD3RIuS0lb2WMRsCJt0XymrRKe-edO9uKI',
-    appId: '1:340302655045:android:b1f0568df7e5e80b93fd2c',
-    messagingSenderId: '340302655045',
-    projectId: 'now-fishing-723a8',
-    storageBucket: 'now-fishing-723a8.firebasestorage.app',
-  );
-
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCaDwQuZhZ2XZIGDBE7noP08PoDC5pim7I',
-    appId: '1:340302655045:ios:a3126305c0173d3493fd2c',
-    messagingSenderId: '340302655045',
-    projectId: 'now-fishing-723a8',
-    storageBucket: 'now-fishing-723a8.firebasestorage.app',
+    apiKey: 'AIzaSyAvOoyc4847kbIx4aW4N-iNi16xhT0vCA8',
+    appId: '1:948326605122:ios:8fd830a786908d302768db',
+    messagingSenderId: '948326605122',
+    projectId: 'now-fishing-final',
+    storageBucket: 'now-fishing-final.firebasestorage.app',
     iosBundleId: 'com.example.busanFushApp',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyCaDwQuZhZ2XZIGDBE7noP08PoDC5pim7I',
     appId: '1:340302655045:ios:a3126305c0173d3493fd2c',

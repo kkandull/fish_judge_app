@@ -1,3 +1,4 @@
+import 'dart:io';
 // lib/services/weather_service.dart
 // v3 — 승인된 KHOA API 실제 엔드포인트로 교체
 //  ✅ /1192136/surveyWaterTemp  — 수온 (실측)
@@ -8,6 +9,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'fishing_score_ml_service.dart';
 import 'dart:math' as math;
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
@@ -106,6 +108,7 @@ class WeatherData {
   final List<WeatherAlert> alerts;
   final DateTime updatedAt;
   final bool isUsingDummy;
+  final bool isCached; // 오프라인 시 캐시에서 불러온 데이터
 
   WeatherData({
     required this.region,
@@ -124,9 +127,32 @@ class WeatherData {
     required this.alerts,
     required this.updatedAt,
     this.isUsingDummy = false,
+    this.isCached = false,
   });
 
   bool get hasActiveAlerts => alerts.any((a) => a.isCurrentlyActive);
+
+  WeatherData copyWith({bool? isCached}) {
+    return WeatherData(
+      region: region,
+      airTempC: airTempC,
+      waterTempC: waterTempC,
+      windSpeedMs: windSpeedMs,
+      windDirection: windDirection,
+      waveHeightM: waveHeightM,
+      rainProbability: rainProbability,
+      skyCondition: skyCondition,
+      current: current,
+      fog: fog,
+      tide: tide,
+      sunMoon: sunMoon,
+      fishingScore: fishingScore,
+      alerts: alerts,
+      updatedAt: updatedAt,
+      isUsingDummy: isUsingDummy,
+      isCached: isCached ?? this.isCached,
+    );
+  }
 }
 
 class CurrentInfo {
@@ -193,7 +219,16 @@ class FishingScore {
   final int score;
   final String grade;
   final List<String> reasons;
-  FishingScore({required this.score, required this.grade, required this.reasons});
+  final bool isMLScore;
+
+  FishingScore({
+    required this.score,
+    required this.grade,
+    required this.reasons,
+    this.isMLScore = false,
+  });
+
+
 
   String get colorHex {
     if (score >= 80) return '0xFF03C75A';
@@ -220,6 +255,8 @@ class WeatherService {
   // 현재 선택 지역 (기본: 부산)
   FishingRegion _selectedRegion = kFishingRegions.first;
   FishingRegion get selectedRegion => _selectedRegion;
+  // ⭐ Gemini용: 마지막으로 로드된 날씨 데이터 접근
+  WeatherData? get cachedData => _cache[_selectedRegion.id];
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -247,17 +284,17 @@ class WeatherService {
 
   /// 특정 지역 데이터 가져오기
   Future<WeatherData> fetchForRegion(FishingRegion region, {bool forceRefresh = false}) async {
-    // 캐시 히트
+    // 캐시 히트 (60분 이내 + 강제갱신 아닌 경우)
     final cached = _cache[region.id];
     final cachedTime = _cachedAt[region.id];
     if (!forceRefresh &&
         cached != null &&
         cachedTime != null &&
         DateTime.now().difference(cachedTime).inMinutes < 60) {
-      return cached;
+      return cached; // 정상 캐시 → isCached=false (신선한 데이터)
     }
 
-    // 이미 같은 지역 요청 진행 중이면 그 Future 공유 (중복 API 호출 방지)
+    // 이미 같은 지역 요청 진행 중이면 그 Future 공유
     if (_inFlight.containsKey(region.id)) {
       return _inFlight[region.id]!;
     }
@@ -267,12 +304,35 @@ class WeatherService {
     try {
       final result = await future;
       return result;
+    } catch (e) {
+      // ⭐ _doFetch 실패 시 (rethrow된 경우) — 캐시 있으면 isCached=true로 반환
+      final fallback = _cache[region.id];
+      if (fallback != null) {
+        debugPrint('⚠️ 오프라인 — 캐시 데이터 표시 (isCached=true)');
+        return fallback.copyWith(isCached: true);
+      }
+      rethrow; // 캐시도 없으면 weather_screen에서 에러 화면 표시
     } finally {
       _inFlight.remove(region.id);
     }
   }
 
   Future<WeatherData> _doFetch(FishingRegion region, {bool forceRefresh = false}) async {
+    // ⭐ 오프라인 선체크: 인터넷 없으면 바로 rethrow (캐시 폴백으로)
+    try {
+      await InternetAddress.lookup('apis.data.go.kr')
+          .timeout(const Duration(seconds: 3));
+    } on SocketException catch (e) {
+      debugPrint('🔴 오프라인 감지 (SocketException): $e');
+      throw SocketException('오프라인');
+    } on TimeoutException catch (e) {
+      debugPrint('🔴 오프라인 감지 (Timeout): $e');
+      throw SocketException('타임아웃');
+    } catch (_) {
+      debugPrint('🔴 오프라인 감지 (기타)');
+      throw SocketException('연결 불가');
+    }
+
     try {
       // ⭐ 6개 API 전부 동시에 병렬 호출 — 가장 느린 것 기준으로 완료
       final results = await Future.wait([
@@ -328,7 +388,13 @@ class WeatherService {
         skyCondition: sky,
         tide: tide,
         sunMoon: sunMoon,
-        fishingScore: score,
+        fishingScore: await _calcScoreWithML(
+          baseScore: score,
+          waterTemp: waterTemp,   // data 선언 전이므로 위에서 선언한 변수 직접 사용
+          windMs: windSpeed,
+          waveM: waveH,
+          tide: tide,
+        ),
         alerts: alerts,
         updatedAt: DateTime.now(),
         isUsingDummy: !ApiConfig.hasKey,
@@ -339,8 +405,15 @@ class WeatherService {
       debugPrint('📊 [날씨] 최종 결과 (${region.name}): 기온=${data.airTempC.toStringAsFixed(1)}°C, 수온=${data.waterTempC.toStringAsFixed(1)}°C, 풍속=${data.windSpeedMs.toStringAsFixed(1)}m/s, 파고=${data.waveHeightM.toStringAsFixed(1)}m, 적합도=${data.fishingScore.score}점 (${data.isUsingDummy ? "⚠️더미" : "✅실제"})');
       return data;
     } catch (e) {
-      debugPrint('fetch 실패(${ region.name}): $e');
-      return _cache[region.id] ?? _dummyData(region);
+      debugPrint('fetch 실패(${region.name}): $e');
+      // 캐시 있으면 캐시 반환 (오프라인이어도 기존 데이터 표시)
+      final cached = _cache[region.id];
+      if (cached != null) {
+        // isCached 플래그를 true로 복사해서 반환
+        return cached.copyWith(isCached: true);
+      }
+      // 캐시도 없으면 예외 re-throw → weather_screen에서 _isOffline 처리
+      rethrow;
     }
   }
 
@@ -713,6 +786,26 @@ class WeatherService {
   }
 
   // ── 낚시 점수 ─────────────────────────────────────
+  // ⭐ ML 점수 보정 — 현재는 규칙 점수만 사용 (ML 모델 학습 데이터 부족)
+  // 실제 조과 데이터 충분히 쌓인 후 활성화 예정
+  Future<FishingScore> _calcScoreWithML({
+    required FishingScore baseScore,
+    required double waterTemp,
+    required double windMs,
+    required double waveM,
+    required TideInfo tide,
+  }) async {
+    // 규칙 기반 점수만 반환 (ML 미사용)
+    return baseScore;
+  }
+
+  int _mulTtaeToInt(String mulTtae) {
+    if (mulTtae.contains('사리')) return 15;
+    if (mulTtae.contains('조금')) return 1;
+    final match = RegExp(r'(\d+)').firstMatch(mulTtae);
+    return int.tryParse(match?.group(1) ?? '7') ?? 7;
+  }
+
   FishingScore _calcScore({
     required double windMs, required double waveM, required int rainProb,
     required double waterTemp, required TideInfo tide, required List<WeatherAlert> alerts,
