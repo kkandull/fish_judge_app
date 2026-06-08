@@ -133,10 +133,8 @@ flutter build appbundle --release
 | ONE store | 정식 출시 | com.nowfishing.app |
 | Google Play | 심사 진행 중 | com.nowfishing.app |
 
-- ONE store 다운로드: [나우 피싱 - 원스토어<img width="234" height="50" alt="image" src="https://github.com/user-attachments/assets/2f67a9ab-863d-4c1b-adba-a32510dacfdf" />
-]
-- 개인정보처리방침: [나우피싱 개인정보처리방침<img width="309" height="49" alt="image" src="https://github.com/user-attachments/assets/8879f7bd-0fb0-469a-9371-a4089124fbf5" />
-]
+- ONE store 다운로드: [https://m.onestore.co.kr/v2/ko-kr/app/0001006359]
+- 개인정보처리방침: [https://kkandull.github.io/nowfishing/privacy.html]
 
 ---
 
