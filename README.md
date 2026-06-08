@@ -130,11 +130,13 @@ flutter build appbundle --release
 
 | 스토어 | 상태 | 패키지 |
 |--------|------|--------|
-| ONE store | 정식 출시 | com.example.busan_fush_app |
+| ONE store | 정식 출시 | com.nowfishing.app |
 | Google Play | 심사 진행 중 | com.nowfishing.app |
 
-- ONE store 다운로드: [ 링크 ]
-- 개인정보처리방침: [ GitHub Pages 링크 ]
+- ONE store 다운로드: [나우 피싱 - 원스토어<img width="234" height="50" alt="image" src="https://github.com/user-attachments/assets/2f67a9ab-863d-4c1b-adba-a32510dacfdf" />
+]
+- 개인정보처리방침: [나우피싱 개인정보처리방침<img width="309" height="49" alt="image" src="https://github.com/user-attachments/assets/8879f7bd-0fb0-469a-9371-a4089124fbf5" />
+]
 
 ---
 
@@ -142,12 +144,10 @@ flutter build appbundle --release
 
 | 이름 | 역할 |
 |------|------|
-| [ 팀원 1 ] | [ 역할 ] |
-| [ 팀원 2 ] | [ 역할 ] |
-| [ 팀원 3 ] | [ 역할 ] |
-| [ 팀원 4 ] | [ 역할 ] |
-
-[ 학과 ] · [ 학번 ] · 2025년 졸업 프로젝트
+| [천준영] | [ 역할 ] |
+| [표재국] | [ 역할 ] |
+| [강태한] | [ 역할 ] |
+| [김승연] | [ 역할 ] |
 
 ---
 
