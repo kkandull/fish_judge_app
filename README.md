@@ -1,11 +1,24 @@
 # NowFishing — AI 기반 낚시 어종 판독 앱
 
 > 사진 한 장으로 어종을 즉시 판독하고, 금어기·날씨·포인트 정보를 통합 제공하는 스마트 낚시 플랫폼
-<img width="1080" height="2082" alt="KakaoTalk_20260609_203708660_01" src="https://github.com/user-attachments/assets/db32c0e8-f50e-4048-b0c7-08002c377abb" />
-<img width="1080" height="2140" alt="KakaoTalk_20260609_231410097_03" src="https://github.com/user-attachments/assets/c567e6c1-f688-4fc5-bb11-fcff91f04a4b" />
-<img width="1080" height="2108" alt="KakaoTalk_20260609_231410097_01" src="https://github.com/user-attachments/assets/b0bfbd53-5ff2-496b-89b8-65edc5f6b00f" />
-<img width="1080" height="2118" alt="KakaoTalk_20260609_231410097" src="https://github.com/user-attachments/assets/5335c448-21c9-4d1d-8d78-7ae979c97a4a" />
-<img width="1080" height="2114" alt="KakaoTalk_20260609_231410097_02" src="https://github.com/user-attachments/assets/5a1e8f12-e588-4248-9bca-9013741d03c6" />
+
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?style=flat-square)](https://flutter.dev)
+[![Firebase](https://img.shields.io/badge/Firebase-Firestore-FFCA28?style=flat-square)](https://firebase.google.com)
+[![TFLite](https://img.shields.io/badge/TFLite-MobileNetV3-FF6F00?style=flat-square)](https://www.tensorflow.org/lite)
+[![ONE store](https://img.shields.io/badge/ONE%20store-정식출시-00C73C?style=flat-square)](https://m.onestore.co.kr/v2/ko-kr/app/0001006359)
+
+---
+
+## 스크린샷
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/db32c0e8-f50e-4048-b0c7-08002c377abb" width="18%" alt="홈 화면"/>
+  <img src="https://github.com/user-attachments/assets/c567e6c1-f688-4fc5-bb11-fcff91f04a4b" width="18%" alt="AI 판독"/>
+  <img src="https://github.com/user-attachments/assets/b0bfbd53-5ff2-496b-89b8-65edc5f6b00f" width="18%" alt="도감"/>
+  <img src="https://github.com/user-attachments/assets/5335c448-21c9-4d1d-8d78-7ae979c97a4a" width="18%" alt="지도"/>
+  <img src="https://github.com/user-attachments/assets/5a1e8f12-e588-4248-9bca-9013741d03c6" width="18%" alt="커뮤니티"/>
+</p>
+
 ---
 
 ## 개요
@@ -74,7 +87,7 @@
 
 **학습 환경**
 - 아키텍처: MobileNetV3-Large (ImageNet 사전학습 → Fine-tuning)
-- 학습 데이터: 총 1926장
+- 학습 데이터: 총 1,926장 (train 1,926 / val 340 / test 220)
 - 증강 기법: RandAugment, MixUp(40%), CutMix(20%), Focal Loss, EMA, 화면/인쇄 강건 증강
 - 학습 환경: NVIDIA RTX 5070 Ti, CUDA 12.x, PyTorch 2.x
 
@@ -84,36 +97,34 @@
 
 ```
 lib/
-├── main.dart                   # 앱 진입점, 네비게이션
-├── models/                     # 데이터 모델
+├── main.dart                    # 앱 진입점, 네비게이션
+├── models/
 │   └── unified_catch_record.dart
-├── screens/                    # 화면
-│   ├── home_screen.dart        # 홈 (날씨, 물때, 적합도)
-│   ├── ai_scan_screen.dart     # AI 판독
+├── screens/
+│   ├── home_screen.dart         # 홈 (날씨, 물때, 적합도)
+│   ├── ai_scan_screen.dart      # AI 판독
 │   ├── encyclopedia_screen.dart # 도감
-│   ├── map_screen.dart         # 포인트 지도
-│   ├── community_screen.dart   # 커뮤니티
-│   └── settings_screen.dart    # 설정
-├── services/                   # 비즈니스 로직
-│   ├── ai_services.dart        # TFLite 추론
-│   ├── weather_service.dart    # 날씨/물때 API
-│   ├── gemini_service.dart     # Gemini API
+│   ├── map_screen.dart          # 포인트 지도
+│   ├── community_screen.dart    # 커뮤니티
+│   └── settings_screen.dart     # 설정
+├── services/
+│   ├── ai_services.dart         # TFLite 추론
+│   ├── weather_service.dart     # 날씨/물때 API
+│   ├── gemini_service.dart      # Gemini API
 │   ├── catch_record_repository.dart
-│   └── regulation_service.dart # 금어기 규정
-└── widgets/                    # 공통 위젯
-    └── unified_catch_form.dart # 조과 입력 폼
+│   └── regulation_service.dart  # 금어기 규정
+└── widgets/
+    └── unified_catch_form.dart  # 조과 입력 폼
 ```
 
 ---
 
 ## 실행 방법
 
-### 요구사항
+**요구사항**
 - Flutter 3.x 이상
 - Android SDK (minSdk 26, targetSdk 34)
 - Firebase 프로젝트 설정 (`google-services.json`)
-
-### 설치 및 실행
 
 ```bash
 git clone https://github.com/[ 저장소 주소 ]
@@ -122,7 +133,7 @@ flutter pub get
 flutter run
 ```
 
-### 릴리즈 빌드
+**릴리즈 빌드**
 
 ```bash
 flutter build appbundle --release
@@ -132,12 +143,10 @@ flutter build appbundle --release
 
 ## 배포 현황
 
-| 스토어 | 상태 | 패키지 |
-|--------|------|--------|
-| ONE store | 정식 출시 | com.nowfishing.app |
-| Google Play | 심사 진행 중 | com.nowfishing.app |
-
-- ONE store 다운로드: [https://m.onestore.co.kr/v2/ko-kr/app/0001006359]
+| 스토어 | 상태 | 링크 |
+|--------|------|------|
+| ONE store | 정식 출시 | [다운로드](https://m.onestore.co.kr/v2/ko-kr/app/0001006359) |
+| Google Play | 심사 진행 중 | — |
 
 ---
 
@@ -158,5 +167,3 @@ flutter build appbundle --release
 - 어종 확대
 - 데이터 기반 낚시 적합도 모델
 - 계정 시스템 및 플랫폼 확장 
-
----
