@@ -1,7 +1,11 @@
 # NowFishing — AI 기반 낚시 어종 판독 앱
 
 > 사진 한 장으로 어종을 즉시 판독하고, 금어기·날씨·포인트 정보를 통합 제공하는 스마트 낚시 플랫폼
-
+<img width="1080" height="2082" alt="KakaoTalk_20260609_203708660_01" src="https://github.com/user-attachments/assets/db32c0e8-f50e-4048-b0c7-08002c377abb" />
+<img width="1080" height="2140" alt="KakaoTalk_20260609_231410097_03" src="https://github.com/user-attachments/assets/c567e6c1-f688-4fc5-bb11-fcff91f04a4b" />
+<img width="1080" height="2108" alt="KakaoTalk_20260609_231410097_01" src="https://github.com/user-attachments/assets/b0bfbd53-5ff2-496b-89b8-65edc5f6b00f" />
+<img width="1080" height="2118" alt="KakaoTalk_20260609_231410097" src="https://github.com/user-attachments/assets/5335c448-21c9-4d1d-8d78-7ae979c97a4a" />
+<img width="1080" height="2114" alt="KakaoTalk_20260609_231410097_02" src="https://github.com/user-attachments/assets/5a1e8f12-e588-4248-9bca-9013741d03c6" />
 ---
 
 ## 개요
@@ -70,7 +74,7 @@
 
 **학습 환경**
 - 아키텍처: MobileNetV3-Large (ImageNet 사전학습 → Fine-tuning)
-- 학습 데이터: 총 2,266장 (train 1,926 / val 340 / test 220)
+- 학습 데이터: 총 1926장
 - 증강 기법: RandAugment, MixUp(40%), CutMix(20%), Focal Loss, EMA, 화면/인쇄 강건 증강
 - 학습 환경: NVIDIA RTX 5070 Ti, CUDA 12.x, PyTorch 2.x
 
@@ -134,18 +138,12 @@ flutter build appbundle --release
 | Google Play | 심사 진행 중 | com.nowfishing.app |
 
 - ONE store 다운로드: [https://m.onestore.co.kr/v2/ko-kr/app/0001006359]
-- 개인정보처리방침: [https://kkandull.github.io/nowfishing/privacy.html]
 
 ---
 
 ## 팀 구성
 
-| 이름 | 역할 |
-|------|------|
-| [천준영] | [ 역할 ] |
-| [표재국] | [ 역할 ] |
-| [강태한] | [ 역할 ] |
-| [김승연] | [ 역할 ] |
+[천준영] [표재국] [강태한] [김승연]
 
 ---
 
@@ -157,10 +155,8 @@ flutter build appbundle --release
 - Firebase 익명 인증 채택으로 앱 재설치 시 조과 기록 유실
 
 **향후 계획**
-- v1.1: 어종 50종 이상으로 확대 (국립수산과학원 DB 활용)
-- v1.2: 실제 조과 데이터 기반 낚시 적합도 ML 모델 전환
-- v2.0: iOS 출시, 다크 모드, 조과 데이터 지도 시각화 (Heatmap)
+- 어종 확대
+- 데이터 기반 낚시 적합도 모델
+- 계정 시스템 및 플랫폼 확장 
 
 ---
-
-## 라이선스
