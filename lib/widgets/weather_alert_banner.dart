@@ -1,5 +1,3 @@
-// lib/widgets/weather_alert_banner.dart
-//
 // 기상특보 배너.
 // 풍랑주의보/태풍경보 등이 발효 중일 때 화면 상단에 표시.
 

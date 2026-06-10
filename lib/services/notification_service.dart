@@ -1,5 +1,3 @@
-// lib/services/notification_service.dart
-//
 // FCM (Firebase Cloud Messaging) + 로컬 알림 통합.
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -80,7 +78,7 @@ class NotificationService {
 
   /// 로컬 알림 초기화
   Future<void> _initLocalNotifications() async {
-    // 💡 팁: 안드로이드에서 앱이 튕긴다면 '@mipmap/ic_launcher' 대신 투명 배경의 '@drawable/ic_notification' 사용 권장
+
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     
     // FCM에서 권한을 이미 요청하므로 iOS 로컬 알림 초기화 시 중복 요청 방지
@@ -95,12 +93,12 @@ class NotificationService {
       iOS: iosSettings,
     );
 
-    // 🚨 최신 패키지 문법(Named Parameter) 복구 완료!
+    
     await _localNotif.initialize(
       settings: initSettings,
       onDidReceiveNotificationResponse: (response) {
         debugPrint('🔔 로컬 알림 탭: ${response.payload}');
-        // TODO: payload 기반 화면 이동
+      
       },
     );
 
@@ -151,7 +149,6 @@ class NotificationService {
     final notification = message.notification;
     if (notification == null) return;
 
-    // 🚨 최신 패키지 문법(Named Parameter) 복구 완료!
     _localNotif.show(
       id: message.hashCode.abs(),
       title: notification.title,
@@ -174,7 +171,6 @@ class NotificationService {
   /// 알림 탭으로 앱 열렸을 때
   void _handleMessageOpened(RemoteMessage message) {
     debugPrint('🔔 알림 탭으로 앱 열림: ${message.data}');
-    // TODO: 게시글 화면으로 이동
   }
 
   /// 사용자 로그아웃 시 토큰 삭제

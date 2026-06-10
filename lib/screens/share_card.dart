@@ -6,21 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
-// ────────────────────────────────────────────────────────────────
-// 📦 pubspec.yaml 추가 패키지 (기존 것 유지, 신규 없음)
-//   share_plus: ^9.0.0  ← 이미 있음
-//
-// 사용법:
-//   await ShareCardUtil.shareRecord(
-//     context,
-//     fishName: "감성돔",
-//     record: record,
-//   );
-// ────────────────────────────────────────────────────────────────
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📌 공유 카드 유틸
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 공유 카드 유틸
 
 class ShareCardUtil {
   /// 공유 카드를 렌더링 → PNG 저장 → 시스템 공유 시트 호출
@@ -86,9 +72,8 @@ class ShareCardUtil {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📌 공유용 데이터 모델 (CatchRecord에서 필요한 필드만)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 공유용 데이터 모델
+
 
 class CatchRecordForShare {
   final String imagePath;
@@ -112,9 +97,8 @@ class CatchRecordForShare {
   });
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📌 공유 카드 위젯 (390 × 가변 px, 고정 너비)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 공유 카드 위젯 
+
 
 class _ShareCard extends StatelessWidget {
   final String fishName;
@@ -160,7 +144,7 @@ class _ShareCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── 헤더 바 ──────────────────────────────────────────
+            // 헤더 바 
             Container(
               padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
               decoration: const BoxDecoration(
@@ -241,7 +225,7 @@ class _ShareCard extends StatelessWidget {
               ),
             ),
 
-            // ── 메인 사진 ─────────────────────────────────────────
+            // 메인 사진 
             Stack(
               children: [
                 Image.file(
@@ -306,7 +290,7 @@ class _ShareCard extends StatelessWidget {
               ],
             ),
 
-            // ── 스탯 행 ──────────────────────────────────────────
+            // 스탯 행
             if (record.lengthCm != null || record.weightG != null)
               Container(
                 margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -352,7 +336,7 @@ class _ShareCard extends StatelessWidget {
                 ),
               ),
 
-            // ── 메모 ─────────────────────────────────────────────
+            // 메모 
             if (record.memo != null && record.memo!.isNotEmpty)
               Container(
                 margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -386,7 +370,7 @@ class _ShareCard extends StatelessWidget {
                 ),
               ),
 
-            // ── 하단 푸터 ─────────────────────────────────────────
+            // 하단 푸터
             Container(
               margin: const EdgeInsets.fromLTRB(16, 14, 16, 20),
               child: Row(
@@ -423,9 +407,7 @@ class _ShareCard extends StatelessWidget {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📌 스탯 셀 위젯
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 스탯 셀 위젯
 
 class _StatCell extends StatelessWidget {
   final String emoji;

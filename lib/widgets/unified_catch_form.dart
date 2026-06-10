@@ -66,21 +66,21 @@ class _UnifiedCatchFormSheetState extends State<_UnifiedCatchFormSheet> {
   late TextEditingController _lengthCtrl;
   late TextEditingController _weightCtrl;
   late TextEditingController _memoCtrl;
-  late TextEditingController _locationSearchCtrl; // ✅ 위치 검색
+  late TextEditingController _locationSearchCtrl; // 위치 검색
 
   File? _pickedImage;
   String _emoji = '🐟';
   String _weather = '☀️ 맑음';
   int _count = 1;
   bool _saving = false;
-  String? _fishError; // ✅ 어종 입력 에러 메시지
+  String? _fishError; // 어종 입력 에러 메시지
 
   // GPS 자동 수집
   Position? _position;
   String? _locationName;
   bool _gpsLoading = false;
 
-  // ✅ 위치 검색
+  // 위치 검색
   bool _locationSearchMode = false; // false=GPS, true=직접입력
   bool _locationSearching = false;
   List<Location> _searchResults = [];
@@ -169,7 +169,7 @@ class _UnifiedCatchFormSheetState extends State<_UnifiedCatchFormSheet> {
     }
   }
 
-  // ✅ 위치 검색 (geocoding 패키지)
+  // 위치 검색 (geocoding 패키지)
   Future<void> _searchLocation(String query) async {
     if (query.trim().isEmpty) {
       setState(() => _searchResults = []);
@@ -190,7 +190,7 @@ class _UnifiedCatchFormSheetState extends State<_UnifiedCatchFormSheet> {
     }
   }
 
-  // ✅ 검색 결과 선택
+  // 검색 결과 선택
   Future<void> _selectLocation(Location loc) async {
     String? name;
     try {
@@ -367,7 +367,7 @@ class _UnifiedCatchFormSheetState extends State<_UnifiedCatchFormSheet> {
                   const SizedBox(height: 16),
                   _buildSpotField(),
                   const SizedBox(height: 16),
-                  _buildLocationSection(), // ✅ 위치 섹션
+                  _buildLocationSection(), // 위치 섹션
                   const SizedBox(height: 16),
                   _buildSizeFields(),
                   const SizedBox(height: 16),
@@ -377,7 +377,7 @@ class _UnifiedCatchFormSheetState extends State<_UnifiedCatchFormSheet> {
                   const SizedBox(height: 16),
                   _buildMemoField(),
                   const SizedBox(height: 24),
-                  // ✅ 저장하기 버튼 바로 위 에러 표시
+                  // 저장하기 버튼 바로 위 에러 표시
                   if (_fishError != null)
                     Container(
                       margin: const EdgeInsets.only(bottom: 8),
@@ -404,7 +404,7 @@ class _UnifiedCatchFormSheetState extends State<_UnifiedCatchFormSheet> {
     );
   }
 
-  // ✅ 위치 섹션 (GPS + 직접 검색 통합)
+  // 위치 섹션 (GPS + 직접 검색 통합)
   Widget _buildLocationSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,7 +465,7 @@ class _UnifiedCatchFormSheetState extends State<_UnifiedCatchFormSheet> {
         const SizedBox(height: 8),
 
         if (_locationSearchMode) ...[
-          // ✅ 직접 검색 입력
+          // 직접 검색 입력
           TextField(
             controller: _locationSearchCtrl,
             style: const TextStyle(fontSize: 14, color: _kNavy),
@@ -509,7 +509,7 @@ class _UnifiedCatchFormSheetState extends State<_UnifiedCatchFormSheet> {
             ),
           ),
 
-          // ✅ 검색 결과 목록
+          // 검색 결과 목록
           if (_searchResults.isNotEmpty) ...[
             const SizedBox(height: 4),
             Container(
@@ -539,7 +539,7 @@ class _UnifiedCatchFormSheetState extends State<_UnifiedCatchFormSheet> {
             ),
           ],
 
-          // ✅ 선택된 위치 표시
+          // 선택된 위치 표시
           if (_manualLocationName != null && _searchResults.isEmpty) ...[
             const SizedBox(height: 8),
             Container(
@@ -565,7 +565,7 @@ class _UnifiedCatchFormSheetState extends State<_UnifiedCatchFormSheet> {
             ),
           ],
         ] else ...[
-          // ✅ GPS 표시 (기존)
+          // GPS 표시 (기존)
           _buildGpsIndicator(),
         ],
       ],

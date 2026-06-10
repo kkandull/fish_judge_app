@@ -1,4 +1,3 @@
-// lib/widgets/region_picker_sheet.dart
 // 지역 선택 바텀시트
 
 import 'package:flutter/material.dart';

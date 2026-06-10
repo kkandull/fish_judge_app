@@ -34,7 +34,7 @@ class _RootScreenState extends State<RootScreen> {
     _lastBackPressedAt = null;
   }
 
-  // ✅ PopScope의 onPopInvokedWithResult 핸들러
+  // PopScope의 onPopInvokedWithResult 핸들러
   void _handlePop(bool didPop, dynamic result) {
     if (didPop) return;
 
@@ -88,7 +88,7 @@ class _RootScreenState extends State<RootScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      // ✅ canPop: false → 시스템이 자동 pop 완전 차단
+      // canPop: false → 시스템이 자동 pop 완전 차단
       canPop: false,
       onPopInvokedWithResult: _handlePop,
       child: Scaffold(

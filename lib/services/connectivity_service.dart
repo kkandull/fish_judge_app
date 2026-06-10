@@ -1,7 +1,4 @@
-// lib/services/connectivity_service.dart
-//
 // 오프라인 감지 통합 서비스.
-//
 // connectivity_plus 패키지 사용 → 실시간 네트워크 변화 감지.
 
 import 'dart:async';

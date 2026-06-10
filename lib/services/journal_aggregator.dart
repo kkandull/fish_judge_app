@@ -1,4 +1,3 @@
-// lib/services/journal_aggregator.dart
 // JournalSummary에 원본 record 추가 — 상세 화면 연결용
 
 import 'package:flutter/foundation.dart';
@@ -16,7 +15,7 @@ class JournalSummary {
   final String source;
   final int count;
   final String emoji;
-  // ⭐ 상세 화면 연결용 — 원본 record 보관
+  // 상세 화면 연결용 — 원본 record 보관
   final UnifiedCatchRecord record;
 
   const JournalSummary({

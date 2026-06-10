@@ -1,5 +1,3 @@
-// lib/services/location_service.dart
-//
 // 전국 관측소 및 기상청 격자 데이터.
 // 사용자 위치 기반 자동 선택 + 수동 선택 지원.
 

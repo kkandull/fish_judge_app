@@ -1,12 +1,5 @@
-// lib/utils/image_encoder.dart
-//
 // 이미지를 Base64로 인코딩.
 // Firestore에 저장하기 위해 Storage 없이 직접 문서 안에 이미지를 넣음.
-//
-// 크기 정책:
-// - 본 이미지: 800px 긴 변 기준 Q75 (~250KB)
-// - 썸네일:   240px 긴 변 기준 Q70 (~15KB)
-//
 // 사용처: 게시글 사진, 조과 기록 사진
 
 import 'dart:io';
@@ -23,7 +16,6 @@ class ImageEncoder {
   static const int _thumbQuality = 70;
   
   /// 게시글 작성 화면(post_compose_screen) 호환용 메소드
-  /// (기존 에러 해결을 위해 추가된 부분입니다)
   static Future<({String thumbBase64, String fullBase64})> encodeForPost(File file) async {
     final result = await encodeImage(file);
     return (
@@ -32,8 +24,6 @@ class ImageEncoder {
     );
   }
 
-  /// 이미지 파일 → Base64 본 + 썸네일
-  /// 
   /// 반환:
   ///   {
   ///     'full': 'iVBORw0KGgo...',   // 본 이미지 Base64

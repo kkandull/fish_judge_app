@@ -1,5 +1,4 @@
-// lib/screens/map_screen.dart
-// ✅ 전국 낚시 포인트 확장 + 지도 최적화
+// 전국 낚시 포인트 확장 + 지도 최적화
 
 import 'dart:async';
 import 'dart:io';
@@ -14,9 +13,7 @@ import '../services/catch_record_repository.dart';
 import '../widgets/unified_catch_form.dart';
 import 'catch_record_detail_screen.dart';
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 디자인 토큰
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const Color kPrimary = Color(0xFF1565C0);
 const Color kNavy    = Color(0xFF0D1B2A);
 const Color kBg      = Color(0xFFF0F4F8);
@@ -76,12 +73,12 @@ class MapMarker {
   LatLng get latLng => LatLng(lat, lng);
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ⭐ 전국 낚시 포인트 데이터
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// 전국 낚시 포인트 데이터
+
 const List<MapMarker> kNationalSpots = [
 
-  // ── 부산 ───────────────────────────────────────────
+  // 부산 
   MapMarker(id:'bs_haeundae',   name:'해운대 방파제',    region:Region.busan,    species:['전갱이','고등어','볼락'],     diff:'초보', lat:35.1588, lng:129.1603, tip:'새벽 입질이 강해요.',             icon:'🌊', kind:MarkerKind.official),
   MapMarker(id:'bs_gwangan',    name:'광안리 방파제',    region:Region.busan,    species:['감성돔','우럭','노래미'],     diff:'중급', lat:35.1531, lng:129.1186, tip:'물때 3~5물 조과 최고.',            icon:'🌉', kind:MarkerKind.official),
   MapMarker(id:'bs_gijang',     name:'기장 동백 방파제', region:Region.busan,    species:['도다리','볼락','전갱이'],     diff:'초보', lat:35.2446, lng:129.2177, tip:'봄 도다리 명소.',                  icon:'🌸', kind:MarkerKind.official),
@@ -92,7 +89,7 @@ const List<MapMarker> kNationalSpots = [
   MapMarker(id:'bs_songjeong',  name:'송정 방파제',      region:Region.busan,    species:['전갱이','고등어','삼치'],     diff:'초보', lat:35.1794, lng:129.2037, tip:'가을 삼치 루어 명소.',             icon:'🎣', kind:MarkerKind.official),
   MapMarker(id:'bs_ilgwang',    name:'일광 방파제',      region:Region.busan,    species:['볼락','도다리','광어'],       diff:'초보', lat:35.2712, lng:129.2298, tip:'봄·가을 볼락 포인트.',            icon:'🐟', kind:MarkerKind.official),
 
-  // ── 경남 ───────────────────────────────────────────
+  // 경남 
   MapMarker(id:'gn_tongyeong',  name:'통영 한산도',      region:Region.gyeongnam,species:['참돔','감성돔','볼락'],       diff:'중급', lat:34.8370, lng:128.4210, tip:'봄·가을 참돔 최고 포인트.',        icon:'🏝️', kind:MarkerKind.official),
   MapMarker(id:'gn_geoje',      name:'거제 학동 몽돌해변',region:Region.gyeongnam,species:['감성돔','볼락','고등어'],     diff:'중급', lat:34.7720, lng:128.7010, tip:'몽돌 갯바위 명소.',               icon:'🪨', kind:MarkerKind.official),
   MapMarker(id:'gn_namhae',     name:'남해 미조항',      region:Region.gyeongnam,species:['갈치','삼치','방어'],         diff:'초보', lat:34.7340, lng:128.0570, tip:'가을 갈치 낚시 명소.',             icon:'🎏', kind:MarkerKind.official),
@@ -100,7 +97,7 @@ const List<MapMarker> kNationalSpots = [
   MapMarker(id:'gn_sacheon',    name:'사천 삼천포항',    region:Region.gyeongnam,species:['볼락','우럭','전갱이'],       diff:'초보', lat:35.0040, lng:128.0620, tip:'방파제 야간 볼락 명소.',           icon:'🌙', kind:MarkerKind.official),
   MapMarker(id:'gn_hadong',     name:'하동 금남 방파제', region:Region.gyeongnam,species:['숭어','감성돔','전어'],       diff:'초보', lat:34.9870, lng:127.9070, tip:'봄 전어·숭어 포인트.',             icon:'🌱', kind:MarkerKind.official),
 
-  // ── 전남 ───────────────────────────────────────────
+  // 전남 
   MapMarker(id:'jn_yeosu',      name:'여수 돌산도',      region:Region.jeonnam,  species:['감성돔','참돔','볼락'],       diff:'중급', lat:34.6640, lng:127.8040, tip:'갯바위 감성돔 명소.',              icon:'🌊', kind:MarkerKind.official),
   MapMarker(id:'jn_wando',      name:'완도 청산도',      region:Region.jeonnam,  species:['참돔','벵에돔','감성돔'],     diff:'고급', lat:34.1860, lng:126.8690, tip:'원도 낚시 최고급 포인트.',         icon:'🏔️', kind:MarkerKind.official),
   MapMarker(id:'jn_mokpo',      name:'목포 달리도',      region:Region.jeonnam,  species:['농어','감성돔','전어'],       diff:'중급', lat:34.7680, lng:126.3340, tip:'조류 강한 농어 포인트.',           icon:'🌀', kind:MarkerKind.official),
@@ -109,7 +106,7 @@ const List<MapMarker> kNationalSpots = [
   MapMarker(id:'jn_sinan',      name:'신안 비금도',      region:Region.jeonnam,  species:['감성돔','벵에돔','참돔'],     diff:'고급', lat:34.7520, lng:125.9890, tip:'서해 원도 낚시 명소.',             icon:'💎', kind:MarkerKind.official),
   MapMarker(id:'jn_boryeong',   name:'보성 벌교 방파제', region:Region.jeonnam,  species:['숭어','감성돔','전어'],       diff:'초보', lat:34.8440, lng:127.3480, tip:'잔잔한 내만 초보 추천.',           icon:'🌾', kind:MarkerKind.official),
 
-  // ── 제주 ───────────────────────────────────────────
+  // 제주 
   MapMarker(id:'jj_seogwipo',   name:'서귀포 외돌개',    region:Region.jeju,     species:['벵에돔','감성돔','자리돔'],   diff:'고급', lat:33.2380, lng:126.5530, tip:'제주 최고의 벵에돔 포인트.',       icon:'🌺', kind:MarkerKind.official),
   MapMarker(id:'jj_mosulpo',    name:'모슬포 방파제',    region:Region.jeju,     species:['방어','부시리','참돔'],       diff:'중급', lat:33.2130, lng:126.2490, tip:'겨울 방어 낚시 명소.',             icon:'🐠', kind:MarkerKind.official),
   MapMarker(id:'jj_hamdeok',    name:'함덕 방파제',      region:Region.jeju,     species:['자리돔','볼락','전갱이'],     diff:'초보', lat:33.5430, lng:126.6640, tip:'초보·가족 낚시 추천.',             icon:'🏄', kind:MarkerKind.official),
@@ -117,27 +114,27 @@ const List<MapMarker> kNationalSpots = [
   MapMarker(id:'jj_aewol',      name:'애월 방파제',      region:Region.jeju,     species:['자리돔','전갱이','볼락'],     diff:'초보', lat:33.4640, lng:126.3200, tip:'석양 낚시 명소.',                  icon:'🌇', kind:MarkerKind.official),
   MapMarker(id:'jj_udo',        name:'우도 방파제',      region:Region.jeju,     species:['방어','부시리','벵에돔'],     diff:'중급', lat:33.5060, lng:126.9520, tip:'블루오션 원도 낚시.',              icon:'🐬', kind:MarkerKind.official),
 
-  // ── 경북 ───────────────────────────────────────────
+  // 경북 
   MapMarker(id:'gb_pohang',     name:'포항 구룡포항',    region:Region.gyeongbuk,species:['도루묵','대구','방어'],       diff:'초보', lat:35.9870, lng:129.5580, tip:'겨울 대구·도루묵 명소.',           icon:'❄️', kind:MarkerKind.official),
   MapMarker(id:'gb_ulleung',    name:'울릉도 저동항',    region:Region.gyeongbuk,species:['오징어','방어','부시리'],     diff:'중급', lat:37.4910, lng:130.9080, tip:'여름 오징어 루어 최고.',            icon:'🦑', kind:MarkerKind.official),
   MapMarker(id:'gb_yeongdeok',  name:'영덕 강구항',      region:Region.gyeongbuk,species:['대게','볼락','노래미'],       diff:'초보', lat:36.5340, lng:129.4100, tip:'봄 대게 포인트.',                  icon:'🦀', kind:MarkerKind.official),
   MapMarker(id:'gb_gyeongju',   name:'경주 감포항',      region:Region.gyeongbuk,species:['감성돔','볼락','전갱이'],     diff:'초보', lat:35.8000, lng:129.5010, tip:'방파제 초보 추천.',                icon:'⛩️', kind:MarkerKind.official),
   MapMarker(id:'gb_uljin',      name:'울진 죽변항',      region:Region.gyeongbuk,species:['대구','방어','볼락'],         diff:'초보', lat:37.0580, lng:129.4210, tip:'겨울 대구 낚시 명소.',             icon:'🏔️', kind:MarkerKind.official),
 
-  // ── 강원 ───────────────────────────────────────────
+  // 강원
   MapMarker(id:'gw_sokcho',     name:'속초 외옹치항',    region:Region.gangwon,  species:['방어','부시리','가자미'],     diff:'중급', lat:38.2170, lng:128.6140, tip:'가을 방어 루어 명소.',             icon:'🍂', kind:MarkerKind.official),
   MapMarker(id:'gw_gangneung',  name:'강릉 안목항',      region:Region.gangwon,  species:['도루묵','방어','전갱이'],     diff:'초보', lat:37.7750, lng:128.9500, tip:'커피거리 근처 방파제.',            icon:'☕', kind:MarkerKind.official),
   MapMarker(id:'gw_donghae',    name:'동해 묵호항',      region:Region.gangwon,  species:['가자미','볼락','노래미'],     diff:'초보', lat:37.5500, lng:129.1200, tip:'사계절 가자미 포인트.',            icon:'🌊', kind:MarkerKind.official),
   MapMarker(id:'gw_samcheok',   name:'삼척 임원항',      region:Region.gangwon,  species:['방어','오징어','가자미'],     diff:'중급', lat:37.2200, lng:129.3500, tip:'가을 방어 떼 출몰.',               icon:'🎯', kind:MarkerKind.official),
   MapMarker(id:'gw_goseong',    name:'고성 거진항',      region:Region.gangwon,  species:['명태','도루묵','가자미'],     diff:'초보', lat:38.4370, lng:128.4790, tip:'동해 최북단 낚시 포인트.',         icon:'🌨️', kind:MarkerKind.official),
 
-  // ── 인천/서해 ──────────────────────────────────────
+  // 인천/서해 
   MapMarker(id:'ic_palmido',    name:'인천 팔미도',      region:Region.incheon,  species:['농어','우럭','광어'],         diff:'중급', lat:37.3060, lng:126.4880, tip:'서해 농어 루어 명소.',             icon:'🏮', kind:MarkerKind.official),
   MapMarker(id:'ic_deokjeok',   name:'인천 덕적도',      region:Region.incheon,  species:['우럭','광어','농어'],         diff:'중급', lat:37.2210, lng:125.9620, tip:'섬낚시 대물 포인트.',             icon:'🏝️', kind:MarkerKind.official),
   MapMarker(id:'ic_muui',       name:'영종도 무의도',    region:Region.incheon,  species:['우럭','광어','숭어'],         diff:'초보', lat:37.4200, lng:126.4090, tip:'당일치기 섬낚시.',                icon:'⛵', kind:MarkerKind.official),
   MapMarker(id:'ic_jawoldo',    name:'자월도 방파제',    region:Region.incheon,  species:['우럭','놀래기','볼락'],       diff:'초보', lat:37.2610, lng:126.0890, tip:'조용한 방파제 낚시.',             icon:'🌙', kind:MarkerKind.official),
 
-  // ── 충남/서해 ──────────────────────────────────────
+  // 충남/서해
   MapMarker(id:'cn_boryeong',   name:'보령 무창포',      region:Region.chungnam, species:['우럭','광어','농어'],         diff:'초보', lat:36.3450, lng:126.5000, tip:'모세의 기적 갯벌 낚시.',           icon:'🌊', kind:MarkerKind.official),
   MapMarker(id:'cn_taean',      name:'태안 학암포',      region:Region.chungnam, species:['광어','우럭','농어'],         diff:'초보', lat:36.9040, lng:126.1940, tip:'서해 광어 최고 포인트.',           icon:'🏖️', kind:MarkerKind.official),
   MapMarker(id:'cn_seocheon',   name:'서천 마량항',      region:Region.chungnam, species:['꽃게','숭어','농어'],         diff:'초보', lat:36.2080, lng:126.6290, tip:'꽃게 낚시 명소.',                  icon:'🦀', kind:MarkerKind.official),
@@ -146,9 +143,7 @@ const List<MapMarker> kNationalSpots = [
 
 const LatLng kKoreaCenter = LatLng(36.0, 127.9);
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Root
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class MyMapScreen extends StatefulWidget {
   const MyMapScreen({super.key});
   @override
@@ -318,9 +313,7 @@ class _MyMapScreenState extends State<MyMapScreen> with SingleTickerProviderStat
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 지도 탭
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class _MapTab extends StatefulWidget {
   final List<MapMarker> officialSpots;
   final List<MapMarker> userSpots;
@@ -345,7 +338,7 @@ class _MapTabState extends State<_MapTab> {
   final MapController _mapCtrl = MapController();
   StreamSubscription<MapEvent>? _mapEventSub;
 
-  // ⭐ 지역 필터 + 난이도 필터
+  // 지역 필터 + 난이도 필터
   Region _regionFilter = Region.all;
   String _diffFilter = '전체';
   final _diffs = ['전체', '추천장소', '사용자'];
@@ -399,7 +392,7 @@ class _MapTabState extends State<_MapTab> {
   void _zoomIn()  { try { final z = _mapCtrl.camera.zoom; if (z < 18) _mapCtrl.move(_mapCtrl.camera.center, z+1); } catch(_) {} }
   void _zoomOut() { try { final z = _mapCtrl.camera.zoom; if (z > 5)  _mapCtrl.move(_mapCtrl.camera.center, z-1); } catch(_) {} }
 
-  // ⭐ 지역 선택 시 해당 지역으로 이동
+  // 지역 선택 시 해당 지역으로 이동
   static const Map<Region, LatLng> _regionCenter = {
     Region.all:       LatLng(36.0, 127.9),
     Region.busan:     LatLng(35.15, 129.05),
@@ -455,7 +448,7 @@ class _MapTabState extends State<_MapTab> {
     ));
   }
 
-  // ⭐ 마커 — 난이도별 색상, 선택 시 크기 확대
+
   Marker _buildMarker(MapMarker m) {
     final isSel = widget.selectedMarker?.id == m.id;
     final sz = isSel ? 52.0 : 44.0;
@@ -503,7 +496,7 @@ class _MapTabState extends State<_MapTab> {
               initialZoom: 7.0,
               minZoom: 6.0,
               maxZoom: 18,
-              // ✅ 드래그 가능 범위를 한국 주변으로 제한
+        
               cameraConstraint: CameraConstraint.containCenter(
                 bounds: LatLngBounds(
                   const LatLng(31.0, 123.5), // 남서쪽 끝 (제주 아래)
@@ -516,7 +509,7 @@ class _MapTabState extends State<_MapTab> {
             ),
             children: [
               TileLayer(
-                // ✅ OpenStreetMap — 전 세계 무료, 회색 영역 없음
+                // OpenStreetMap
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.busan_fush_app',
                 errorTileCallback: (tile, error, _) {
@@ -568,7 +561,7 @@ class _MapTabState extends State<_MapTab> {
             ]),
           ),
 
-          // ⭐ 하단 시트 — 지역 + 난이도 필터 + 포인트 목록
+          // 하단 시트 — 지역 + 난이도 필터 + 포인트 목록
           DraggableScrollableSheet(
             initialChildSize: 0.32, minChildSize: 0.12, maxChildSize: 0.85,
             builder: (ctx, sc) => Container(
@@ -583,7 +576,7 @@ class _MapTabState extends State<_MapTab> {
                     decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(3))),
                 )),
 
-                // ⭐ 지역 필터 (가로 스크롤)
+                // 지역 필터 (가로 스크롤)
                 SliverToBoxAdapter(child: SizedBox(
                   height: 36,
                   child: ListView(
@@ -705,9 +698,7 @@ class _MapTabState extends State<_MapTab> {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 정보 팝업
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class _InfoPopup extends StatelessWidget {
   final MapMarker marker;
   final VoidCallback onClose;
@@ -807,9 +798,7 @@ class _InfoPopup extends StatelessWidget {
   );
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 포인트 카드
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class _SpotListCard extends StatelessWidget {
   final MapMarker spot;
   final bool isSelected;
@@ -873,9 +862,7 @@ class _SpotListCard extends StatelessWidget {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 조과 일지 탭
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class _JournalTab extends StatelessWidget {
   final List<UnifiedCatchRecord> records;
   final Function(UnifiedCatchRecord) onDelete;

@@ -1,14 +1,11 @@
-// lib/services/weather_alert_service.dart
-// 기상특보 조회 서비스 — 전국 지역 대응
+// 기상특보 조회 서비스
 
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 모델
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class WeatherAlert {
   final AlertType type;
@@ -88,9 +85,7 @@ extension AlertLevelExt on AlertLevel {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 서비스
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class WeatherAlertService {
   static final WeatherAlertService instance = WeatherAlertService._();
@@ -103,7 +98,7 @@ class WeatherAlertService {
   /// 활성 특보 가져오기
   ///
   /// [apiKey]   — 공공데이터포털 키
-  /// [stnId]    — 지역 코드 (기본: '26' 부산). 전국='' 또는 생략.
+  /// [stnId]    — 지역 코드 
   /// [forceRefresh] — 캐시 무시
   Future<List<WeatherAlert>> fetchActiveAlerts({
     required String apiKey,

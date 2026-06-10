@@ -1,16 +1,5 @@
 import 'dart:convert';
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📌 통합 조과 기록 모델 (Phase 3)
-//
-// 도감(EncyclopediaScreen)과 지도(MapScreen) 양쪽의 데이터 필드를 모두 포함하는
-// 상위집합 모델. 사용처에 따라 일부 필드만 활용.
-//
-// 출처 추적:
-//   - 'ai_scan': AI 판독으로 추가된 기록 (도감)
-//   - 'encyclopedia': 도감에서 직접 추가
-//   - 'map': 지도에서 조과 기록 (사진 없음)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class UnifiedCatchRecord {
   final String id;                  // 고유 ID (millisecondsSinceEpoch)
@@ -20,8 +9,8 @@ class UnifiedCatchRecord {
   // ── 위치 정보 ─────────────────────────────────────────
   final double? latitude;           // 위도 (GPS)
   final double? longitude;          // 경도 (GPS)
-  final String? locationName;       // 역지오코딩 결과 (예: "부산광역시 해운대구")
-  final String? spotName;           // 사용자 지정 포인트 이름 (예: "해운대 방파제 끝단")
+  final String? locationName;       // 역지오코딩 결과 
+  final String? spotName;           // 사용자 지정 포인트 이름 
 
   // ── 사진 / 측정 ───────────────────────────────────────
   final String? imagePath;          // 로컬 사진 경로 (도감용)
@@ -29,10 +18,10 @@ class UnifiedCatchRecord {
   final double? weightG;
 
   // ── 메모 / 장식 ───────────────────────────────────────
-  final String memo;                // 메모 (기본 '')
-  final String emoji;               // 어종 이모지 (기본 '🐟')
-  final String weather;             // 날씨 (기본 '☀️ 맑음')
-  final int count;                  // 마릿수 (기본 1)
+  final String memo;                // 메모 
+  final String emoji;               // 어종 이모지 
+  final String weather;             // 날씨 
+  final int count;                  // 마릿수 
 
   // ── 출처 ─────────────────────────────────────────────
   final String createdFrom;         // 'ai_scan' | 'encyclopedia' | 'map'
@@ -55,7 +44,6 @@ class UnifiedCatchRecord {
     this.createdFrom = 'unknown',
   });
 
-  // ── 편의 메서드 ────────────────────────────────────────
 
   /// 사진 있는지 (도감에 표시할지 결정)
   bool get hasPhoto => imagePath != null && imagePath!.isNotEmpty;
@@ -119,7 +107,7 @@ class UnifiedCatchRecord {
     );
   }
 
-  // ── JSON 직렬화 ───────────────────────────────────────
+  // JSON 직렬화
 
   Map<String, dynamic> toJson() => {
         'id': id,

@@ -1,9 +1,7 @@
-// lib/screens/community_screen.dart
-//
-// 커뮤니티 메인 화면 — 완성본.
-// ✅ Pull-to-refresh / 오프라인 배너 / 검색 / 카테고리 / 정렬
-// ✅ 깜빡임 수정: _streamKey 완전 제거 → _cachedPosts 방식으로 교체
-// ✅ _PostCard StatefulWidget + AutomaticKeepAlive + 이미지 캐싱
+// 커뮤니티 메인 화면
+// Pull-to-refresh / 오프라인 배너 / 검색 / 카테고리 / 정렬
+// 깜빡임 수정: _streamKey 완전 제거 → _cachedPosts 방식으로 교체
+// _PostCard StatefulWidget + AutomaticKeepAlive + 이미지 캐싱
 
 import 'dart:async';
 import 'dart:convert';
@@ -48,13 +46,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
   PostCategory _selectedCategory = PostCategory.all;
   PostSortOption _selectedSort = PostSortOption.latest;
 
-  // ✅ _streamKey 완전 제거.
-  // 스트림은 항상 살아있고, 새로고침 시에는 _refreshTrigger를 bump해서
-  // PostService가 최신 데이터를 다시 fetch하도록 유도한다.
-  // ConnectionState.waiting 으로 빠지지 않으므로 깜빡임 없음.
   int _refreshTrigger = 0;
 
-  // ✅ 마지막으로 받은 포스트 목록 캐시 — 새로고침 중에도 기존 목록 유지
   List<CommunityPost> _cachedPosts = [];
   bool _hasFetched = false;  // 첫 fetch 완료 여부 (빈 목록도 포함)
   bool _isRefreshing = false;
@@ -202,9 +195,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  // ✅ 새로고침: UniqueKey()로 스트림 끊지 않고 trigger만 bump
-  // → StreamBuilder는 ConnectionState.waiting으로 빠지지 않음
-  // → _cachedPosts가 유지되므로 기존 목록이 그대로 보임
+
   Future<void> _onRefresh() async {
     HapticFeedback.lightImpact();
     if (mounted) setState(() => _isRefreshing = true);
@@ -228,7 +219,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
         ),
         actions: [
-          // ✅ 새로고침 중일 때 앱바에 작은 인디케이터 표시 (목록은 그대로)
+    
           if (_isRefreshing)
             const Padding(
               padding: EdgeInsets.only(right: 4),
@@ -265,7 +256,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     onRefresh: _onRefresh,
                     color: _kPrimary,
                     child: StreamBuilder<List<CommunityPost>>(
-                      // ✅ key 없음 — 스트림을 끊지 않으므로 waiting 상태 없음
+                      
                       stream: PostService.instance.watchPosts(
                         searchKeyword: _searchKeyword,
                         sort: _selectedSort,
@@ -296,14 +287,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
                           );
                         }
 
-                        // ✅ 새 데이터가 오면 캐시 갱신 + 첫 fetch 완료 표시
                         if (snap.hasData) {
                           _cachedPosts = snap.data!;
                           _hasFetched = true;
                         }
 
-                        // ✅ 한 번도 fetch 안 됐을 때만 로딩 UI
-                        // _hasFetched = true면 빈 목록이어도 스켈레톤 안 보여줌
                         if (!_hasFetched &&
                             snap.connectionState == ConnectionState.waiting) {
                           return _buildLoadingList();
@@ -629,12 +617,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 게시글 카드
-// ✅ StatefulWidget + AutomaticKeepAliveClientMixin — 깜빡임 방지
-// ✅ 이미지 디코딩 결과 캐싱 — 좋아요/댓글 업데이트 시 이미지 재디코딩 안 함
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 class _PostCard extends StatefulWidget {
   final CommunityPost post;
   final String searchKeyword;

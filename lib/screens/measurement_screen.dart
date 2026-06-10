@@ -29,7 +29,7 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
     _initRegData(); // 화면 시작 시 규정 데이터 로드
   }
 
-  // 📥 규정 서비스 초기화 로직 추가
+  // 규정 서비스 초기화 로직 추가
   Future<void> _initRegData() async {
     await _regulationService.loadRegulations();
     if (mounted) {
@@ -153,10 +153,10 @@ class _MeasurementScreenState extends State<MeasurementScreen> {
                         Text("금지체장 기준: $limit", 
                             style: const TextStyle(fontSize: 13, color: Colors.blueGrey)),
                         
-                        // ✨ 비고란이 있을 때만 화면에 표시 (오류 수정됨)
+                        // 비고란이 있을 때만 화면에 표시
                         if (note.isNotEmpty)
                           Padding(
-                            padding: const EdgeInsets.only(top: 6), // 👈 EdgeInsets.only를 사용하세요!
+                            padding: const EdgeInsets.only(top: 6), 
                             child: Text(
                               note, 
                               style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontStyle: FontStyle.italic),

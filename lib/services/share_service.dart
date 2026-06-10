@@ -16,7 +16,7 @@ class ShareService {
     await Share.share(text);
   }
 
-  // ✅ 조과 카드 이미지로 렌더링 후 단일 PNG로 공유
+  // 조과 카드 이미지로 렌더링 후 단일 PNG로 공유
   static Future<void> shareRecordAsCard(
     BuildContext context, {
     required UnifiedCatchRecord record,
@@ -70,9 +70,7 @@ class ShareService {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 공유용 카드 위젯 (390px 고정폭, PNG 렌더링용)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 공유용 카드 위젯 
 
 class _ShareCardWidget extends StatelessWidget {
   final UnifiedCatchRecord record;
@@ -125,7 +123,7 @@ class _ShareCardWidget extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ── 헤더 ──────────────────────────────────────
+            // 헤더 
             Container(
               padding: const EdgeInsets.fromLTRB(20, 22, 20, 16),
               color: const Color(0xFF163652),
@@ -184,7 +182,7 @@ class _ShareCardWidget extends StatelessWidget {
               ),
             ),
 
-            // ── 메인 사진 or 이모지 배경 ───────────────────
+            // 메인 사진 or 이모지 배경
             Stack(
               children: [
                 // 사진
@@ -236,7 +234,7 @@ class _ShareCardWidget extends StatelessWidget {
               ],
             ),
 
-            // ── 스탯 행 ───────────────────────────────────
+            // 스탯 행 
             if (record.lengthCm != null || record.weightG != null)
               Container(
                 margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -268,7 +266,7 @@ class _ShareCardWidget extends StatelessWidget {
                 ]),
               ),
 
-            // ── 조과 정보 텍스트 박스 ─────────────────────
+            // 조과 정보 텍스트 박스 
             Container(
               margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
               padding: const EdgeInsets.all(14),
@@ -299,7 +297,7 @@ class _ShareCardWidget extends StatelessWidget {
               ),
             ),
 
-            // ── 메모 ──────────────────────────────────────
+            // 메모 
             if (record.memo.isNotEmpty)
               Container(
                 margin: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -329,7 +327,7 @@ class _ShareCardWidget extends StatelessWidget {
                 ),
               ),
 
-            // ── 푸터 ──────────────────────────────────────
+            // 푸터 
             Container(
               margin: const EdgeInsets.fromLTRB(16, 14, 16, 20),
               child: Row(

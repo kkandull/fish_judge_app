@@ -1,12 +1,6 @@
-// lib/screens/post_detail_screen.dart
-//
 // 게시글 상세 화면.
-// ✅ 신고/차단 메뉴 통합 + 사용자 친화적 UX
-// ✅ Pull-to-refresh 지원
-// ✅ 좋아요 후 이미지 깜빡임 제거:
-//    - StatefulWidget _PostImages 로 이미지 bytes 캐싱
-//    - watchPost re-emit 때 base64Decode 재실행 없음
-//    - gaplessPlayback: true 로 교체 시 깜빡임 방지
+// 신고/차단 메뉴 통합 
+// Pull-to-refresh 지원
 
 import 'dart:convert';
 import 'dart:typed_data';
@@ -324,8 +318,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                                 ),
                               ),
                             ],
-
-                            // ✅ 이미지: StatefulWidget으로 분리해 bytes 캐싱
                             // watchPost가 re-emit해도 base64Decode 재실행 없음
                             if (post.hasImage) ...[
                               const SizedBox(height: 16),
@@ -607,14 +599,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 게시글 이미지 뷰어
-//
-// ✅ StatefulWidget으로 분리 — watchPost re-emit 시에도
-//    부모 StreamBuilder가 rebuild돼도 이 위젯은 State 유지
-// ✅ _decodedImages 캐싱 — 이미지 소스가 바뀐 경우에만 재디코딩
-// ✅ gaplessPlayback: true — 프레임 교체 시 깜빡임 방지
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class _PostImages extends StatefulWidget {
   final CommunityPost post;

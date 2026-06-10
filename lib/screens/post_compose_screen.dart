@@ -1,11 +1,9 @@
-// lib/screens/post_compose_screen.dart
-//
-// 게시글 작성 화면 v3.
-// ✅ 사진 최대 5장 다중 업로드 (가로 스크롤, 인스타 스타일)
-// ✅ 작성 가이드 표시
-// ✅ 금지 키워드 클라이언트 1차 필터링 (정치/성/욕설)
-// ✅ 제출 전 최종 확인 다이얼로그
-// ✅ prefilledImage 파일 존재 확인
+// 게시글 작성 화면
+// 사진 최대 5장 다중 업로드 (가로 스크롤, 인스타 스타일)
+// 작성 가이드 표시
+// 금지 키워드 클라이언트 1차 필터링 (정치/성/욕설)
+// 제출 전 최종 확인 다이얼로그
+// prefilledImage 파일 존재 확인
 
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -60,7 +58,7 @@ class _PostComposeScreenState extends State<PostComposeScreen> {
     if (widget.prefilledFishName != null) {
       _titleController.text = '${widget.prefilledFishName} 잡았어요!';
     }
-    // ✅ prefilledImage를 동기적으로 즉시 추가
+    // prefilledImage를 동기적으로 즉시 추가
     // 파일 유효성은 submit 시점에 검증
     if (widget.prefilledImage != null) {
       _selectedImages.add(widget.prefilledImage!);
@@ -172,7 +170,7 @@ class _PostComposeScreenState extends State<PostComposeScreen> {
       final List<String> thumbList = [];
       final List<String> fullList = [];
       for (final file in _selectedImages) {
-        // ✅ submit 시점에 파일 존재 여부 검증
+        // submit 시점에 파일 존재 여부 검증
         final exists = await file.exists();
         if (!exists) {
           debugPrint('[PostCompose] 파일 없음, 건너뜀: ${file.path}');

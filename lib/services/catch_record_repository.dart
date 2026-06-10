@@ -6,21 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/unified_catch_record.dart';
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 📌 통합 조과 저장소 (Phase 3)
-//
-// 모든 조과 기록을 'unified_catch_records' 단일 키에 저장.
-// 도감(EncyclopediaScreen)과 지도(MapScreen) 양쪽이 같은 저장소 참조.
-//
-// 마이그레이션:
-//   첫 실행 시 옛 키(records_*, fishing_records_v3)에서 데이터 읽어와
-//   통합 저장소로 복사. 한 번만 실행됨 (migration_v3_done 플래그).
-//
-// 사용:
-//   final repo = CatchRecordRepository.instance;
-//   await repo.init();  // 앱 시작 시 한 번
-//   final records = await repo.getAll();
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class CatchRecordRepository {
   CatchRecordRepository._();
@@ -45,9 +30,7 @@ class CatchRecordRepository {
   /// 변경 알림 스트림. 어디서 데이터 변경되면 모든 구독자에게 통지.
   Stream<void> get changes => _changeController.stream;
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 초기화 + 마이그레이션
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 초기화 + 마이그레이션
 
   /// 앱 시작 시 1회 호출. 마이그레이션이 필요하면 자동 수행.
   Future<void> init() async {
@@ -66,7 +49,7 @@ class CatchRecordRepository {
       debugPrint('✅ 마이그레이션 완료');
     } catch (e) {
       debugPrint('❌ 마이그레이션 실패: $e');
-      // 실패 시 플래그 안 set → 다음 실행 시 재시도
+      // 실패 시 플래그 안 set
     }
   }
 
@@ -178,9 +161,7 @@ class CatchRecordRepository {
     }
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 조회
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 조회
 
   /// 모든 기록 (최신순)
   Future<List<UnifiedCatchRecord>> getAll() async {
@@ -243,9 +224,7 @@ class CatchRecordRepository {
     };
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 수정
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 수정
 
   /// 새 기록 추가
   Future<void> add(UnifiedCatchRecord record) async {
@@ -292,9 +271,8 @@ class CatchRecordRepository {
     }
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 어종 목록 (도감 + 자동 등록)
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  // 어종 목록 (도감 + 자동 등록)
 
   static const List<String> defaultFishNames = [
     "감성돔", "광어", "우럭", "쥐노래미", "참돔",
@@ -328,9 +306,8 @@ class CatchRecordRepository {
     debugPrint('새 어종 자동 등록: $fishName');
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 📌 내부 헬퍼
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 내부 헬퍼
+
 
   Future<void> _saveAll(
       SharedPreferences prefs, List<UnifiedCatchRecord> records) async {

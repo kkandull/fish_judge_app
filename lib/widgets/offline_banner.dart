@@ -1,5 +1,3 @@
-// lib/widgets/offline_banner.dart
-//
 // 오프라인 상태 배너 위젯.
 // 어떤 화면에서든 wrap해서 사용.
 

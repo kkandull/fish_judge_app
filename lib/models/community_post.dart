@@ -1,7 +1,5 @@
-// lib/models/community_post.dart
-//
 // 커뮤니티 게시글 모델.
-// 이미지는 Base64로 인코딩되어 Firestore 안에 저장됨.
+
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -14,7 +12,7 @@ class CommunityPost {
   final List<String> imageBase64Thumbs;  // 썸네일 목록
   final List<String> imageBase64Fulls;   // 본 이미지 목록
   final String? linkedFishName;
-  final String category; // ✅ 'catch' / 'question' / 'info'
+  final String category; 
   final DateTime createdAt;
   final int likeCount;
   final int commentCount;
@@ -54,7 +52,7 @@ class CommunityPost {
         ? List<String>.from(data['imageBase64Fulls'])
         : (data['imageBase64Full'] != null ? [data['imageBase64Full'] as String] : []),
       linkedFishName: data['linkedFishName'] as String?,
-      category: data['category'] as String? ?? 'catch', // ✅ 기존 글은 catch로 fallback
+      category: data['category'] as String? ?? 'catch', 
       createdAt: ts?.toDate() ?? DateTime.now(),
       likeCount: (data['likeCount'] as num?)?.toInt() ?? 0,
       commentCount: (data['commentCount'] as num?)?.toInt() ?? 0,

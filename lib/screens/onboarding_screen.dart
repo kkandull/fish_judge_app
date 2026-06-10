@@ -1,6 +1,3 @@
-// lib/screens/onboarding_screen.dart
-// ✅ 최신 기능 반영 버전
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,9 +28,7 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 온보딩 페이지 데이터
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class _OPage {
   final String emoji;
   final String title;
@@ -205,9 +200,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 페이지 콘텐츠
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 class _PageContent extends StatelessWidget {
   final _OPage page;
   const _PageContent({required this.page});
