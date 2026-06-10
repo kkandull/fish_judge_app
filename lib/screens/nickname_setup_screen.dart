@@ -1,7 +1,4 @@
-// lib/screens/nickname_setup_screen.dart
-//
 // 닉네임 설정 화면.
-// ✅ 키보드 올라올 때 OVERFLOW 41px 문제 해결
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -96,7 +93,7 @@ class _NicknameSetupScreenState extends State<NicknameSetupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      // ✅ 키보드 올라올 때 자동으로 화면 조정
+      // 키보드 올라올 때 자동으로 화면 조정
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -107,7 +104,7 @@ class _NicknameSetupScreenState extends State<NicknameSetupScreen> {
         ),
         iconTheme: const IconThemeData(color: _kNavy),
       ),
-      // ✅ SingleChildScrollView로 감싸서 키보드와 충돌 안 함
+      // SingleChildScrollView로 감싸서 키보드와 충돌 안 함
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -231,7 +228,7 @@ class _NicknameSetupScreenState extends State<NicknameSetupScreen> {
             ),
             const SizedBox(height: 32),
             
-            // ✅ 시작하기 버튼을 본문에 배치 (bottomNavigationBar 안 씀)
+            // 시작하기 버튼을 본문에 배치 (bottomNavigationBar 안 씀)
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -264,7 +261,7 @@ class _NicknameSetupScreenState extends State<NicknameSetupScreen> {
                       ),
               ),
             ),
-            // ✅ 키보드 위 여백 (스크롤 가능)
+            // 키보드 위 여백 (스크롤 가능)
             const SizedBox(height: 20),
           ],
         ),

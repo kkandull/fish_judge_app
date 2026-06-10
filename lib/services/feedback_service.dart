@@ -1,4 +1,3 @@
-// lib/services/feedback_service.dart
 // 사용자 피드백을 Firestore 'feedbacks' 컬렉션에 저장
 
 import 'package:cloud_firestore/cloud_firestore.dart';

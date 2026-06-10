@@ -1,6 +1,4 @@
-// lib/screens/home_screen.dart
-// ✅ 8번(스켈레톤) + 9번(에러 UI) + 13번(낚시팁) + 4번(출처) 반영
-// - 수산자원관리법 시행령 별표 1·2 (2026.1.1 기준)
+// 홈 스크린 
 
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -20,9 +18,7 @@ const Color _kPrimary = Color(0xFF1976D2);
 const Color _kNavy = Color(0xFF212529);
 const Color _kSub = Color(0xFF868E96);
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 데이터 모델
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 enum FishCategory { fish, crustacean, shellfish, seaweed, other }
 
@@ -48,9 +44,7 @@ class FishingRestriction {
   });
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 별표 1 + 별표 2 통합 데이터
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 금어기 금지체장 
 
 const List<FishingRestriction> kFishingRestrictions = [
 
@@ -180,9 +174,8 @@ List<FishingRestriction> getSizeRestrictedList() {
   return kFishingRestrictions.where((r) => r.minSizeLabel != null).toList();
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 // 홈 화면
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class HomeScreen extends StatefulWidget {
   final void Function(int index)? onNavigateTab;
@@ -290,9 +283,9 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: _loading
-            ? _buildSkeleton() // ⭐ 8번: 스켈레톤
+            ? _buildSkeleton() 
             : _hasError && _weather == null
-                ? _buildErrorState() // ⭐ 9번: 에러 UI
+                ? _buildErrorState() 
                 : RefreshIndicator(
                     onRefresh: _handleRefresh,
                     color: _kPrimary,
@@ -331,9 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // ⭐ 8번: 스켈레톤 로딩
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
   Widget _buildSkeleton() {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
@@ -354,9 +345,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _sk(double w, double h, {double r = 8}) =>
       _ShimmerBox(width: w, height: h, radius: r);
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // ⭐ 9번: 에러 상태 UI
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
   Widget _buildErrorState() {
     return Center(
       child: Padding(
@@ -396,10 +385,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 금어기 배너
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Widget _buildRestrictionBanner(List<FishingRestriction> restrictions) {
     final month = DateTime.now().month;
     return GestureDetector(
@@ -707,7 +693,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
   }
 
-  // ⭐ 13번: 낚시 팁 카드
+  // 낚시 팁 카드
   Widget _buildEmptyRecentCard() {
     final tips = _getFishingTips();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -869,9 +855,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 금어기 전체보기 화면
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class FishingRestrictionScreen extends StatefulWidget {
   final List<FishingRestriction> currentMonthRestrictions;
@@ -1112,10 +1096,6 @@ class _FishingRestrictionScreenState extends State<FishingRestrictionScreen>
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ⭐ ShimmerBox (스켈레톤 애니메이션)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
 class _ShimmerBox extends StatefulWidget {
   final double width;
   final double height;
@@ -1159,9 +1139,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
 }
 
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// 피드백 유도 팝업 (자동 표시용 — 간소 버전)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 피드백 유도 팝업
 
 class _FeedbackPromptDialog extends StatefulWidget {
   @override

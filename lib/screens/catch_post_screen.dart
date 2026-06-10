@@ -1,9 +1,7 @@
-// lib/screens/catch_post_screen.dart
-//
 // 조과 기록 → 낚시 블로그/카페 글 자동 변환
-// ─ 3가지 템플릿 (블로그 / 카페 / 인스타)
-// ─ 메모, 크기, 무게, 위치 자동 포함
-// ─ 전체 복사 / 커뮤니티 공유
+// 3가지 템플릿 (블로그 / 카페 / 인스타)
+// 메모, 크기, 무게, 위치 자동 포함
+// 전체 복사 / 커뮤니티 공유
 
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -17,9 +15,7 @@ const Color _kSub   = Color(0xFF6B7684);
 const Color _kGreen = Color(0xFF03C75A);
 const Color _kOrange= Color(0xFFF97316);
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 데이터 구조
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class _PostData {
   final String fish;
@@ -54,9 +50,7 @@ class _PostData {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 메인 화면
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class CatchPostScreen extends StatefulWidget {
   final UnifiedCatchRecord record;
@@ -97,7 +91,7 @@ class _CatchPostScreenState extends State<CatchPostScreen> {
     _bodyCtrl.text  = _buildBody(_tplIdx, _d);
   }
 
-  // ── 전체 텍스트 ─────────────────────────────────────
+  // 전체 텍스트
   String get _fullText {
     final title = _titleCtrl.text.trim();
     final body  = _bodyCtrl.text.trim();
@@ -105,7 +99,7 @@ class _CatchPostScreenState extends State<CatchPostScreen> {
     return '$title\n\n$body';
   }
 
-  // ── 템플릿 제목 ─────────────────────────────────────
+  // 템플릿 제목
   String _buildTitle(int idx, _PostData d) {
     switch (idx) {
       case 0: return '[${d.fish} 조과] ${d.date} ${d.spot}';
@@ -114,7 +108,7 @@ class _CatchPostScreenState extends State<CatchPostScreen> {
     }
   }
 
-  // ── 템플릿 본문 ─────────────────────────────────────
+  // 템플릿 본문 
   String _buildBody(int idx, _PostData d) {
     switch (idx) {
       case 0: return _blog(d);
@@ -181,7 +175,7 @@ class _CatchPostScreenState extends State<CatchPostScreen> {
     return sb.toString().trim();
   }
 
-  // ── 복사 ────────────────────────────────────────────
+  // 복사 
   void _copy() {
     Clipboard.setData(ClipboardData(text: _fullText));
     HapticFeedback.mediumImpact();
@@ -203,7 +197,7 @@ class _CatchPostScreenState extends State<CatchPostScreen> {
     );
   }
 
-  // ── 커뮤니티 ────────────────────────────────────────
+  // 커뮤니티 
   Future<void> _shareToApp() async {
     if (!widget.record.hasPhoto) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -214,7 +208,7 @@ class _CatchPostScreenState extends State<CatchPostScreen> {
       );
       return;
     }
-    // ✅ 파일 존재 확인
+    // 파일 존재 확인
     final imageFile = File(widget.record.imagePath!);
     final exists = await imageFile.exists();
     if (!mounted) return;

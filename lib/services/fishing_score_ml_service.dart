@@ -1,15 +1,5 @@
-// lib/services/fishing_score_ml_service.dart
 // TFLite 기반 낚시 적합도 ML 점수 예측 서비스
-//
-// 사용 방법:
-// final score = await FishingScoreMLService.instance.predict(
-//   waterTempC: 18.5,
-//   windSpeedMs: 3.2,
-//   waveHeightM: 0.8,
-//   mulTtae: 7,
-//   month: 6,
-//   hour: 6,
-// );
+
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -25,7 +15,7 @@ class FishingScoreMLService {
   List<double>? _normMax;
   bool _initialized = false;
 
-  // ── 초기화 ────────────────────────────────────────
+  // 초기화 
   Future<void> init() async {
     try {
       // TFLite 모델 로드
@@ -48,8 +38,7 @@ class FishingScoreMLService {
 
   bool get isAvailable => _initialized && _interpreter != null;
 
-  // ── ML 점수 예측 ──────────────────────────────────
-  // 반환: 0~100 사이 정수. 실패 시 null (기존 규칙 점수 사용)
+  // ML 점수 예측
   Future<int?> predict({
     required double waterTempC,
     required double windSpeedMs,

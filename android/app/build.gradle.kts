@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.nowfishing.app"
-    compileSdk = 36       // ✅ 1-1: API 35로 고정
+    compileSdk = 36       
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -23,7 +23,7 @@ android {
     defaultConfig {
         applicationId = "com.nowfishing.app"
         minSdk = 26
-        targetSdk = 36      // ✅ 1-1: API 35 타겟
+        targetSdk = 36      
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -39,8 +39,7 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
-            // ✅ 1-4: ProGuard/R8 난독화 + 리소스 축소
+            signingConfig = signingConfigs.getByName("release") 
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

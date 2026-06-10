@@ -259,34 +259,27 @@ class _MainSkeletonState extends State<MainSkeleton> {
     }
   }
 
-  // ✅ 핵심: PopScope의 onPopInvokedWithResult 사용 (Flutter 3.12+)
-  //    canPop: false → 시스템이 절대 자동으로 pop하지 않음
-  //    onPopInvokedWithResult → 뒤로가기 눌릴 때마다 여기서 직접 처리
-  void _handlePop(bool didPop, dynamic result) {
-    if (didPop) return; // canPop: false 이므로 didPop은 항상 false
 
-    // 1. 열려있는 dialog/bottomSheet가 있으면 그것만 닫기
-    //    (루트 Navigator에 쌓인 overlay route 처리)
+  void _handlePop(bool didPop, dynamic result) {
+    if (didPop) return;
+
     final nav = Navigator.of(context, rootNavigator: true);
     if (nav.canPop()) {
       nav.pop();
       return;
     }
 
-    // 2. 홈 탭이 아니면 홈으로
     if (_selectedIndex != 0) {
       setState(() => _selectedIndex = 0);
       return;
     }
 
-    // 3. 홈 탭에서는 종료 다이얼로그
     _showExitDialog();
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      // ✅ canPop: false → Flutter/안드로이드가 자동 pop 완전 차단
       canPop: false,
       onPopInvokedWithResult: _handlePop,
       child: Scaffold(

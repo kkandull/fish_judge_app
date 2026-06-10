@@ -1,8 +1,6 @@
-// lib/widgets/report_block_dialogs.dart
-//
-// 신고/차단 다이얼로그 v2.
-// ✅ 성/정치/홍보 사유 추가
-// ✅ 더 구체적인 가이드
+// 신고/차단 다이얼로그 
+// 성/정치/홍보 사유 추가
+// 더 구체적인 가이드
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,7 +28,7 @@ class _ReportReason {
   });
 }
 
-/// ✅ 사유 8가지로 확대
+/// 사유 
 const List<_ReportReason> _kReportReasons = [
   _ReportReason(
     code: 'spam',
@@ -82,9 +80,7 @@ const List<_ReportReason> _kReportReasons = [
   ),
 ];
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 신고 다이얼로그
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class ReportDialog extends StatefulWidget {
   final String postId;
@@ -410,9 +406,7 @@ class _ReportDialogState extends State<ReportDialog> {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 차단 다이얼로그 (기존과 동일)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class BlockDialog extends StatelessWidget {
   final String targetUid;

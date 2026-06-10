@@ -1,5 +1,3 @@
-// lib/screens/catch_record_detail_screen.dart
-//
 // 조과 일지 상세 화면 — 전체 편집 가능 버전
 // 편집 가능: 어종명, 날짜/시간, 포인트명, 길이, 무게, 마릿수, 메모, (사진 추후)
 // 읽기 전용: GPS 좌표 (지도 연동)
@@ -38,7 +36,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
   bool _editing = false;
   bool _saving = false;
 
-  // ── 편집 컨트롤러 ───────────────────────────────────────
+  // 편집 컨트롤러 
   late TextEditingController _fishNameCtrl;
   late TextEditingController _spotNameCtrl;
   late TextEditingController _lengthCtrl;
@@ -81,7 +79,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
     super.dispose();
   }
 
-  // ── 날짜 선택 ────────────────────────────────────────────
+  // 날짜 선택 
   Future<void> _pickDate() async {
     final date = await showDatePicker(
       context: context,
@@ -113,7 +111,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
     });
   }
 
-  // ── 사진 교체 ────────────────────────────────────────────
+  // 사진 교체 
   Future<void> _pickPhoto() async {
     final picker = ImagePicker();
     final source = await showModalBottomSheet<ImageSource>(
@@ -158,7 +156,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
     } catch (_) {}
   }
 
-  // ── 저장 ────────────────────────────────────────────────
+  // 저장 
   Future<void> _saveEdit() async {
     final fishName = _fishNameCtrl.text.trim();
     if (fishName.isEmpty) {
@@ -233,7 +231,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
     _initControllers();
   }
 
-  // ── 삭제 ────────────────────────────────────────────────
+  // 삭제 
   Future<void> _delete() async {
     final ok = await showDialog<bool>(
       context: context,
@@ -259,7 +257,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
     if (mounted) Navigator.pop(context, true);
   }
 
-  // ── 공유 ────────────────────────────────────────────────
+  // 공유 
   Future<void> _copy() async {
     await ShareService.copy(_generated);
     HapticFeedback.mediumImpact();
@@ -308,7 +306,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
     ));
   }
 
-  // ── 글 생성 ──────────────────────────────────────────────
+  // 글 생성 
   String get _generated => switch (_tplIdx) { 0 => _blog(), 1 => _cafe(), _ => _insta() };
 
   String get _sizeStr {
@@ -371,9 +369,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
     return sb.toString().trim();
   }
 
-  // ─────────────────────────────────────────────────────────
   // 빌드
-  // ─────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final r = _record;
@@ -387,7 +383,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
       backgroundColor: _kBg,
       body: CustomScrollView(
         slivers: [
-          // ── SliverAppBar ──────────────────────────────────
+          // SliverAppBar
           SliverAppBar(
             expandedHeight: displayPhoto != null ? 280 : 160,
             pinned: true,
@@ -468,13 +464,13 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
                   ]),
                 ),
 
-              // ── 조과 정보 카드 ─────────────────────────────
+              // 조과 정보 카드 
               _sectionCard(
                 title: '조과 정보', icon: Icons.set_meal,
                 child: _editing ? _buildEditForm() : _buildInfoView(r),
               ),
 
-              // ── 메모 카드 ──────────────────────────────────
+              // 메모 카드 
               _sectionCard(
                 title: '메모', icon: Icons.sticky_note_2_outlined,
                 trailing: !_editing ? GestureDetector(
@@ -543,7 +539,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
                   ]),
                 ),
 
-              // ── 자동 생성 글 (편집 중 숨김) ──────────────
+              // 자동 생성 글 (편집 중 숨김) 
               if (!_editing) _buildGeneratedSection(),
 
               const SizedBox(height: 100),
@@ -595,7 +591,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
     );
   }
 
-  // ── 보기 모드 ────────────────────────────────────────────
+  // 보기 모드
   Widget _buildInfoView(UnifiedCatchRecord r) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _infoRow(Icons.category_outlined, '어종', r.fishName),
@@ -617,7 +613,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
     ]);
   }
 
-  // ── 편집 폼 (전체 필드) ──────────────────────────────────
+  // 편집 폼 (전체 필드) 
   Widget _buildEditForm() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       // 어종명
@@ -676,7 +672,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
     ]);
   }
 
-  // ── 자동 생성 글 섹션 ────────────────────────────────────
+  // 자동 생성 글 섹션 
   Widget _buildGeneratedSection() {
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
@@ -723,7 +719,7 @@ class _CatchRecordDetailScreenState extends State<CatchRecordDetailScreen> {
     );
   }
 
-  // ── 공통 위젯 ────────────────────────────────────────────
+  // 공통 위젯 
 
   Widget _emojiHero(UnifiedCatchRecord r) => Container(
     decoration: BoxDecoration(gradient: LinearGradient(

@@ -1,4 +1,3 @@
-// lib/widgets/fishing_stats_dashboard.dart
 // 도감 상단 — 수집 현황 제거, 나만의 낚시 통계 대시보드
 
 import 'dart:io';
@@ -28,7 +27,7 @@ class _FishingStatsDashboardState extends State<FishingStatsDashboard> {
   void initState() {
     super.initState();
     _load();
-    // ⭐ 조과 기록 변경 시 자동 갱신
+    // 조과 기록 변경 시 자동 갱신
     _changeSub = CatchRecordRepository.instance.changes.listen((_) {
       if (mounted) _load();
     });
@@ -321,8 +320,7 @@ class _FishingStatsDashboardState extends State<FishingStatsDashboard> {
       '${dt.year}.${dt.month.toString().padLeft(2,'0')}.${dt.day.toString().padLeft(2,'0')}';
 }
 
-// ── 통계 계산 ─────────────────────────────────────
-
+// 통계 계산 
 class _Stats {
   final int totalCount;
   final int uniqueSpecies;

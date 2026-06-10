@@ -7,16 +7,14 @@ import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../services/ai_services.dart';
-import '../services/gemini_service.dart';
 import '../services/google_drive_service.dart';
-import '../services/weather_service.dart';
 import '../services/regulation_service.dart';
 import 'measurement_screen.dart';
 import 'encyclopedia_screen.dart';
-import 'post_compose_screen.dart'; // ✅ Day 6 추가
+import 'post_compose_screen.dart'; 
 
 class AiScanScreen extends StatefulWidget {
-  final bool isActive; // ⭐ 탭 활성화 여부
+  final bool isActive; 
   const AiScanScreen({super.key, this.isActive = false});
 
   @override
@@ -57,7 +55,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
       // 기본 플래시 OFF로 시작
       await _cameraController!.setFlashMode(FlashMode.off);
       if (mounted) setState(() => _isCameraInitialized = true);
-      // ⭐ 자동 감지는 탭 진입 시 didChangeDependencies에서 실행
+    
     } catch (e) {
       debugPrint('카메라 에러: $e');
       // 권한 거부 감지 (CameraException 또는 권한 관련 에러)
@@ -82,7 +80,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
     super.dispose();
   }
 
-  // ── 앱 생명주기: 백그라운드 가면 플래시 끄기 ──────────────
+  
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
@@ -94,7 +92,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
     }
   }
 
-  // 📅 금어기 판단 로직
+  // 금어기 판단 로직
   bool _checkIfProhibited(String? range) {
     if (range == null ||
         range.contains("없음") ||
@@ -118,7 +116,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
     }
   }
 
-  // ── 플래시 토글 ─────────────────────────────────
+  // 플래시 토글
   Future<void> _toggleFlash() async {
     if (_cameraController == null || !_isCameraInitialized) return;
     final newMode = _isFlashOn ? FlashMode.off : FlashMode.torch;
@@ -126,7 +124,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
     setState(() => _isFlashOn = !_isFlashOn);
   }
 
-  // ── 조도 자동 감지 → 어두우면 플래시 자동 ON ────────
+  // 조도 자동 감지 → 어두우면 플래시 자동 ON
   Future<void> _checkAndAutoFlash() async {
     if (!_autoFlashEnabled || _cameraController == null) return;
     if (_cameraController!.value.isStreamingImages) return;
@@ -174,7 +172,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
     }
   }
 
-  // ── 카메라 촬영 + 가이드라인 영역 크롭
+  // 카메라 촬영 + 가이드라인 영역 크롭
   Future<void> _takeAndAnalyzePhoto() async {
     if (_isAnalyzing) return;
     setState(() => _isAnalyzing = true);
@@ -222,7 +220,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
     return tmpFile;
   }
 
-  // ── 갤러리에서 사진 선택 후 분석
+  // 갤러리에서 사진 선택 후 분석
   Future<void> _pickFromGalleryAndAnalyze() async {
     if (_isAnalyzing) return;
 
@@ -249,7 +247,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
     }
   }
 
-  // ✅ Day 6 추가: 커뮤니티에 질문 올리기
+  
   void _askCommunity(File image, String? guessedFishName) {
     Navigator.push(
       context,
@@ -262,7 +260,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
     );
   }
 
-  // 🎨 튜토리얼 팝업 (기존 그대로)
+  // 튜토리얼 팝업
   void _showTutorialDialog() {
     showDialog(
       context: context,
@@ -336,8 +334,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
     );
   }
 
-  // ✨ 결과 바텀 시트 (Top-3 + 안전 경고 + 면책 + 커뮤니티 질문)
-  // ── 오답 신고 다이얼로그 ───────────────────────────────────
+  // 오답 신고 다이얼로그
   void _showWrongAnswerDialog(BuildContext sc, File file, String predicted) {
     final commentCtrl = TextEditingController();
     bool uploading = false;
@@ -433,9 +430,8 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
     final isPro = reg != null && _checkIfProhibited(reg["금어기"]);
     final isIncomplete = reg != null && _regulationService.isRegulationIncomplete(reg);
 
-    // ✅ Day 6: 커뮤니티 질문 노출 조건
-    // - 신뢰도 낮을 때 (50% 미만 또는 isReliable=false)
-    // - background로 잘못 잡힌 게 아니어야 함
+    // 신뢰도 낮을 때 (50% 미만 또는 isReliable=false)
+    // background로 잘못 잡힌 게 아니어야 함
     final showAskCommunity = !isBackground && 
         (!result.isReliable || top.confidence < 0.6);
 
@@ -476,7 +472,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
               ),
               const SizedBox(height: 15),
 
-              // ─── 결과 헤더
+              // 결과 헤더
               Center(
                 child: Text(
                   showFishInfo ? "🐟 ${top.koreanName}" : "어종 인식 실패",
@@ -499,31 +495,31 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
                 ),
               const SizedBox(height: 16),
 
-              // ─── 경고 메시지
+              // 경고 메시지
               if (result.warningMessage != null) _buildWarningBox(result.warningMessage!),
 
-              // ─── 위험 어종 경고
+              // 위험 어종 경고
               if (result.dangerMessage != null) ...[
                 const SizedBox(height: 10),
                 _buildDangerBox(result.dangerMessage!),
               ],
 
-              // ─── 인식 실패 시 촬영 가이드
+              // 인식 실패 시 촬영 가이드
               if (!showFishInfo) _buildRetryGuide(),
 
-              // ─── Top-3 후보 표시
+              // Top-3 후보 표시
               if (showFishInfo) ...[
                 const SizedBox(height: 12),
                 _buildTopCandidates(result.topCandidates),
               ],
 
-              // ─── 규정 정보 카드
+              // 규정 정보 카드
               if (showFishInfo && reg != null) ...[
                 const SizedBox(height: 12),
                 _buildRegulationCard(reg, isPro, isIncomplete, top.koreanName, file),
               ],
 
-              // ─── 규정 정보 없음
+              // 규정 정보 없음
               if (showFishInfo && reg == null) ...[
                 const SizedBox(height: 12),
                 Container(
@@ -552,14 +548,10 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
                 ),
               ],
 
-              // ─── ⭐ Gemini AI 낚시 조언
-              if (showFishInfo) _GeminiTipsCard(
-                fishName: top.koreanName,
-              ),
 
               const SizedBox(height: 20),
 
-              // ─── 도감 저장 버튼 (신뢰 가능한 경우만)
+              // 도감 저장 버튼 (신뢰 가능한 경우만)
               if (showFishInfo)
                 SizedBox(
                   width: double.infinity,
@@ -588,13 +580,13 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
                 ),
               if (showFishInfo) const SizedBox(height: 10),
 
-              // ✅ Day 6 추가: 커뮤니티에 물어보기 (신뢰도 낮을 때)
+              
               if (showAskCommunity)
                 _buildAskCommunityCard(file, showFishInfo ? top.koreanName : null),
 
               if (showAskCommunity) const SizedBox(height: 10),
 
-              // ─── 닫기 버튼
+              // 닫기 버튼
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -611,7 +603,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
               ),
               const SizedBox(height: 12),
 
-              // ─── 면책 문구
+              // 면책 문구
               _buildDisclaimer(),
 
               TextButton(
@@ -628,7 +620,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
     );
   }
 
-  // ✅ Day 6 신규: 커뮤니티 질문 카드
+  // 커뮤니티 질문 카드
   Widget _buildAskCommunityCard(File file, String? guessedFish) {
     return Container(
       width: double.infinity,
@@ -976,7 +968,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
     );
   }
 
-  // ── 탭 전환 감지: isActive 파라미터 변화 감지 ───────────────
+  // 탭 전환 감지: isActive 파라미터 변화 감지 
   @override
   void didUpdateWidget(AiScanScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -1061,10 +1053,10 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
       body: Stack(
         children: [
 
-          // ── 카메라 프리뷰 ──────────────────────────────
+          // 카메라 프리뷰 
           Positioned.fill(child: CameraPreview(_cameraController!)),
 
-          // ── 어두운 오버레이 (가이드라인 구멍) ────────────
+          // 어두운 오버레이 (가이드라인 구멍)
           Positioned.fill(
             child: ColorFiltered(
               colorFilter: ColorFilter.mode(
@@ -1083,7 +1075,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
             ),
           ),
 
-          // ── 가이드라인 테두리 ──────────────────────────
+          // 가이드라인 테두리
           Align(
             alignment: const Alignment(0, -0.1),
             child: Container(
@@ -1098,7 +1090,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
             ),
           ),
 
-          // ── 상단 바 (안내 문구) ────────────────────────
+          // 상단 바 (안내 문구)
           Positioned(
             top: safePadding.top + 16,
             left: 0, right: 0,
@@ -1117,7 +1109,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
             ),
           ),
 
-          // ── 우측 상단 버튼 그룹 ────────────────────────
+          // 우측 상단 버튼 그룹 
           Positioned(
             top: safePadding.top + 14,
             right: 16,
@@ -1143,7 +1135,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
             ),
           ),
 
-          // ── 가이드라인 아래 힌트 텍스트 ──────────────────
+          // 가이드라인 아래 힌트 텍스트 
           Align(
             alignment: const Alignment(0, 0.28),
             child: Text(
@@ -1155,7 +1147,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
             ),
           ),
 
-          // ── 하단 컨트롤 ───────────────────────────────
+          // 하단 컨트롤
           Positioned(
             bottom: safePadding.bottom + 48,
             left: 0, right: 0,
@@ -1231,9 +1223,7 @@ class _AiScanScreenState extends State<AiScanScreen> with WidgetsBindingObserver
 }
 
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 카메라 UI 공통 위젯
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 // 우측 아이콘 버튼 (플래시 / 길이재는법)
 class _IconBtn extends StatelessWidget {
@@ -1364,114 +1354,4 @@ class _CornerPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_) => false;
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// ⭐ Gemini AI 낚시 조언 카드
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-class _GeminiTipsCard extends StatefulWidget {
-  final String fishName;
-  const _GeminiTipsCard({required this.fishName});
-
-  @override
-  State<_GeminiTipsCard> createState() => _GeminiTipsCardState();
-}
-
-class _GeminiTipsCardState extends State<_GeminiTipsCard> {
-  List<String>? _tips;
-  bool _loading = true;
-  bool _failed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadTips();
-  }
-
-  Future<void> _loadTips() async {
-    final weather = WeatherService.instance.cachedData;
-    final tips = await GeminiService.instance.getFishingTipsAfterCapture(
-      fishName: widget.fishName,
-      waterTempC: weather?.waterTempC ?? 18.0,
-      waveHeightM: weather?.waveHeightM ?? 0.5,
-      month: DateTime.now().month,
-    );
-    if (mounted) {
-      setState(() {
-        _tips = tips;
-        _loading = false;
-        _failed = tips == null;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Gemini 사용 불가 또는 실패 시 카드 숨김
-    if (_failed && !_loading) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [const Color(0xFF1565C0).withOpacity(0.06),
-                   const Color(0xFF42A5F5).withOpacity(0.03)],
-          begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFF1976D2).withOpacity(0.15)),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1976D2),
-              borderRadius: BorderRadius.circular(6)),
-            child: const Row(mainAxisSize: MainAxisSize.min, children: [
-              Text('✨', style: TextStyle(fontSize: 10)),
-              SizedBox(width: 3),
-              Text('AI 낚시 코치',
-                style: TextStyle(
-                  color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
-            ]),
-          ),
-          const Spacer(),
-          Text('Gemini 1.5 Flash',
-            style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
-        ]),
-        const SizedBox(height: 12),
-        if (_loading)
-          Row(children: [
-            SizedBox(
-              width: 14, height: 14,
-              child: CircularProgressIndicator(
-                strokeWidth: 1.5,
-                color: const Color(0xFF1976D2).withOpacity(0.6))),
-            const SizedBox(width: 10),
-            Text('AI가 맞춤 조언을 생성 중이에요...',
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
-          ])
-        else if (_tips != null)
-          Column(
-            children: _tips!.map((tip) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(
-                  width: 20, height: 20,
-                  margin: const EdgeInsets.only(right: 8, top: 1),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1976D2).withOpacity(0.1),
-                    shape: BoxShape.circle),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.check, size: 11, color: Color(0xFF1976D2))),
-                Expanded(child: Text(tip,
-                  style: const TextStyle(
-                    fontSize: 13, color: Color(0xFF212529), height: 1.45))),
-              ]),
-            )).toList(),
-          ),
-      ]),
-    );
-  }
-}
+}     

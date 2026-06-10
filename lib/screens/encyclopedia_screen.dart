@@ -1,7 +1,4 @@
-// lib/screens/encyclopedia_screen.dart
-// 🎨 완전 리디자인 — 실제 앱 수준 도감 화면
-// 테마: 딥 네이비 + 민트/틸 액센트 + 부드러운 카드
-// 실제 어종 이미지 느낌의 그라디언트 + 물고기 실루엣
+// 장비 및 도감 화면
 
 import 'dart:io';
 import 'dart:async';
@@ -18,9 +15,8 @@ import '../widgets/fishing_stats_dashboard.dart';
 import '../services/gemini_service.dart';
 import '../services/weather_service.dart';
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 // 디자인 토큰
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 const Color _kNavy     = Color(0xFF0D1B2A);
 const Color _kBlue     = Color(0xFF1565C0);
 const Color _kSky      = Color(0xFF1E88E5);
@@ -52,7 +48,7 @@ const List<Color> _kDefaultFishColors = [Color(0xFF1A3A5C), Color(0xFF2980B9)];
 List<Color> _fishGradient(String name) =>
     _kFishColors[name] ?? _kDefaultFishColors;
 
-// 어종별 대표 실루엣 이모지 매핑 (더 다양하게)
+// 어종별 대표 실루엣 이모지 매핑
 const Map<String, String> _kFishEmoji = {
   '감성돔': '🐟', '참돔': '🐟', '벵에돔': '🐟', '노래미': '🐟',
   '쥐노래미': '🐟', '우럭': '🐟', '볼락': '🐟', '광어': '🐟',
@@ -83,9 +79,7 @@ const List<Map<String, dynamic>> kCommonGear = [
   },
 ];
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 메인 화면
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class EncyclopediaScreen extends StatefulWidget {
   final File? capturedImage;
@@ -230,7 +224,7 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
         createdFrom: 'encyclopedia');
   }
 
-  // ── 갤러리 ────────────────────────────────────────
+  // 갤러리 
   void _showFishGallery(String fishName, List<UnifiedCatchRecord> records) {
     final colors = _fishGradient(fishName);
     showModalBottomSheet(
@@ -313,7 +307,7 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
     );
   }
 
-  // ── 상세 팝업 ─────────────────────────────────────
+  // 상세 팝업 
   void _showFishDetailPopup(BuildContext context, UnifiedCatchRecord record) {
     final colors = _fishGradient(record.fishName);
     showDialog(
@@ -456,7 +450,7 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
             behavior: SnackBarBehavior.floating));
       return;
     }
-    // ✅ 파일 존재 여부 확인
+    // 파일 존재 여부 확인
     final imageFile = File(record.imagePath!);
     final exists = await imageFile.exists();
     if (!mounted) return;
@@ -591,9 +585,7 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
   void _openGearShop() => Navigator.push(context,
       MaterialPageRoute(builder: (_) => const GearShopScreen()));
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // BUILD
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -742,9 +734,8 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
     );
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // ⭐ C. Gemini 낚시 패턴 분석 카드
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // Gemini 낚시 패턴 분석 카드
+
   Widget _buildPatternInsightCard() {
     final allRecords = recordMap.values.expand((e) => e).toList();
     final hasEnough = allRecords.length >= 3;
@@ -911,9 +902,7 @@ class _EncyclopediaScreenState extends State<EncyclopediaScreen>
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 물고기 히어로 배경 (사진 없을 때)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class _FishHeroBg extends StatelessWidget {
   final String fishName;
@@ -970,9 +959,7 @@ class _WavePainter extends CustomPainter {
   @override bool shouldRepaint(_) => false;
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 그리드 카드
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class _FishGridCard extends StatelessWidget {
   final String fishName;
@@ -1257,9 +1244,7 @@ class _FishListCard extends StatelessWidget {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 갤러리 카드
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class _GalleryCard extends StatelessWidget {
   final UnifiedCatchRecord record;
@@ -1326,9 +1311,7 @@ class _GalleryCard extends StatelessWidget {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 공통 위젯들
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class _StatChip extends StatelessWidget {
   final IconData icon;
@@ -1427,9 +1410,7 @@ class _TextField extends StatelessWidget {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 장비 추천 페이지
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class GearShopScreen extends StatelessWidget {
   const GearShopScreen({super.key});

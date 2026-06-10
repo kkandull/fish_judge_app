@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 
-// ── dangerMessage 필드 추가
+// dangerMessage 필드 추가
 class AiPredictionResult {
   final List<FishCandidate> topCandidates;
   final bool isReliable;
@@ -69,7 +69,7 @@ class AiService {
   ];
 
   Future<void> loadModel() async {
-    interpreter = await Interpreter.fromAsset('assets/fish_model_float16.tflite');
+    interpreter = await Interpreter.fromAsset('assets/model_float32.tflite');
 
     final labelData = await rootBundle.loadString('assets/labels.txt');
     labels = labelData
@@ -80,8 +80,10 @@ class AiService {
 
     final inputShape  = interpreter.getInputTensor(0).shape;
     final outputShape = interpreter.getOutputTensor(0).shape;
+    final inputTensor = interpreter.getInputTensor(0);
     print("✅ 모델 로드 완료");
     print("   Input  shape : $inputShape");
+    print("   Input  type  : ${inputTensor.type}");
     print("   Output shape : $outputShape");
     print("   라벨 수       : ${labels!.length}개");
 
@@ -113,15 +115,12 @@ class AiService {
     return kConfusingPairs.any((cp) => cp.containsAll(pair));
   }
 
-  // ── [핵심 수정] 정규화: 무조건 255.0 고정 + 0~1 클램프
-  /// PyTorch의 ToTensor()와 정확히 같은 동작:
-  ///   1) uint8 픽셀(0~255)을 0.0~1.0으로 변환
-  ///   2) ImageNet mean/std로 정규화
+
   List<double> _runSingleInference(img.Image image) {
     const mean     = [0.485, 0.456, 0.406];
     const std      = [0.229, 0.224, 0.225];
     const cropSize = 224;
-    const double inv255 = 1.0 / 255.0;  // ← 학습과 동일하게 무조건 255
+    const double inv255 = 1.0 / 255.0;  
 
     final inputShape = interpreter.getInputTensor(0).shape;
     final bool isNCHW = (inputShape.length == 4 && inputShape[1] == 3);
@@ -134,9 +133,9 @@ class AiService {
             List.generate(cropSize, (x) {
               final pixel = image.getPixel(x, y);
               final ch    = [pixel.r, pixel.g, pixel.b];
-              // 픽셀이 8비트보다 크면(16비트 PNG 등) 8비트로 다운스케일
+              // 픽셀이 8비트보다 크면 8비트로 다운스케일
               double v = ch[c].toDouble();
-              if (v > 255.0) v = v / 257.0;  // 16비트(0~65535) → 8비트(0~255) 근사
+              if (v > 255.0) v = v / 257.0;  
               return (v * inv255 - mean[c]) / std[c];
             })
           )
@@ -169,7 +168,7 @@ class AiService {
   }
 
   Future<AiPredictionResult> predict(File imageFile) async {
-    // ── 1. 이미지 로드 + EXIF 보정
+    // 이미지 로드 + EXIF 보정
     final rawBytes = imageFile.readAsBytesSync();
     final decoded  = img.decodeImage(rawBytes);
     if (decoded == null) {
@@ -177,10 +176,6 @@ class AiService {
     }
     final rawImage = img.bakeOrientation(decoded);
 
-    // ── 2. 비율 무시하고 224×224로 강제 리사이즈
-    //     PC TFLite 검증 스크립트(PIL Image.resize((224, 224)))와 정확히 동일.
-    //     이 방식이 학습 시 transforms.Resize→CenterCrop과는 다르지만,
-    //     실제로 변환된 모델은 이 입력에 최적화되어 있음 (검증 정확도 84.55%).
     const int cropSize = 224;
     final img.Image cropped = img.copyResize(
       rawImage,
@@ -189,13 +184,13 @@ class AiService {
       interpolation: img.Interpolation.linear,  // PIL의 기본은 BILINEAR
     );
 
-    // ── 3. 단일 추론 (TTA 제거 — 학습 시 HorizontalFlip 이미 적용됨)
+    // 단일 추론 (TTA 제거 — 학습 시 HorizontalFlip 이미 적용됨)
     final raw = _runSingleInference(cropped);
 
-    // ── 4. 확률 변환
+    // 확률 변환
     final List<double> probs = _toProbs(raw);
 
-    // ── 진단 로그 (배포 전 제거 가능)
+    // 진단 로그 (배포 전 제거 가능)
     final sortedProbs = (probs.asMap().entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value)))
         .take(3)
@@ -203,7 +198,7 @@ class AiService {
         .toList();
     print("[AiService] Top-3: $sortedProbs");
 
-    // ── 5. Top-3 추출
+    // Top-3 추출
     final indexed = probs.asMap().entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
@@ -216,7 +211,7 @@ class AiService {
       );
     }).toList();
 
-    // ── 6. 안전성 판단
+    // 안전성 판단
     final top1 = top3[0].confidence;
     final top2 = top3.length > 1 ? top3[1].confidence : 0.0;
 
@@ -245,7 +240,7 @@ class AiService {
       }
     }
 
-    // ── 7. 위험 어종 경고 (신뢰 가능 + background 아님 + 충분히 확신할 때만)
+    // 위험 어종 경고 (신뢰 가능 + background 아님 + 충분히 확신할 때만)
     String? dangerMessage;
     final isBackground = top3[0].englishLabel == "5_background";
     final isHighConfidence = top1 >= kReliableThreshold;

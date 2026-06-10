@@ -1,5 +1,3 @@
-// lib/services/auth_service.dart
-//
 // 익명 로그인 + 닉네임 관리.
 // Firebase Anonymous Auth를 사용해 회원가입 없이 사용자 식별.
 // 닉네임은 한 번 정하면 변경 불가 (스팸/혼란 방지).

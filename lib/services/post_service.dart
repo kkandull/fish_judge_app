@@ -1,14 +1,5 @@
-// lib/services/post_service.dart
-//
 // 커뮤니티 게시글 관련 모든 Firestore 작업.
-//
-// 데이터 구조:
-//   posts/{postId}                           — 게시글
-//   posts/{postId}/comments/{commentId}      — 댓글
-//   posts/{postId}/likes/{userId}            — 좋아요
-//   reports/{reportId}                       — 신고
-//
-// ⚠️ 인덱스 없이 동작하도록 클라이언트 필터링 사용.
+// 인덱스 없이 동작하도록 클라이언트 필터링 사용.
 
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -51,9 +42,7 @@ class PostService {
   CollectionReference<Map<String, dynamic>> get _posts => _db.collection('posts');
   CollectionReference<Map<String, dynamic>> get _reports => _db.collection('reports');
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 게시글 작성
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   
   Future<String> createPost({
     required String title,
@@ -102,9 +91,7 @@ class PostService {
     return docRef.id;
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // 게시글 조회 — ✅ 통합 검색/정렬/카테고리
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 게시글 조회 — 통합 검색/정렬/카테고리
 
   /// 게시글 목록 실시간 스트림
   ///
@@ -188,9 +175,7 @@ class PostService {
     });
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 게시글 삭제
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Future<void> deletePost(String postId) async {
     final uid = AuthService.instance.uid;
@@ -203,9 +188,7 @@ class PostService {
     await _posts.doc(postId).delete();
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 좋아요
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Future<bool> toggleLike(String postId) async {
     final uid = AuthService.instance.uid;
@@ -246,9 +229,7 @@ class PostService {
         .map((doc) => doc.exists);
   }
 
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 댓글
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Future<void> addComment(String postId, String body) async {
     final uid = AuthService.instance.uid;
@@ -306,10 +287,8 @@ class PostService {
       tx.update(postRef, {'commentCount': FieldValue.increment(-1)});
     });
   }
-
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  
   // 신고
-  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   Future<void> reportPost(String postId, String reason) async {
     final uid = AuthService.instance.uid;

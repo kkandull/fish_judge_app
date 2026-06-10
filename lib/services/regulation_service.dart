@@ -10,7 +10,7 @@ class RegulationService {
       final String response = await rootBundle.loadString('assets/fish_rules.json');
       final decoded = json.decode(response) as Map<String, dynamic>;
 
-      // _meta는 분리해서 보관 (어종 데이터와 섞이지 않게)
+      // _meta는 분리해서 보관
       _meta = decoded['_meta'] as Map<String, dynamic>?;
       _regulationData = Map.from(decoded)..remove('_meta');
 

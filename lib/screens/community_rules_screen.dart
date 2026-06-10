@@ -1,8 +1,4 @@
-// lib/screens/community_rules_screen.dart
-//
 // 커뮤니티 운영 정책 화면.
-// ✅ 글쓰기 첫 진입 시 표시
-// ✅ 설정에서 다시 보기 가능
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

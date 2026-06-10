@@ -1,4 +1,3 @@
-// lib/services/google_drive_service.dart
 // 오답 신고 사진 + 내용을 Google Apps Script → Google Drive로 전송
 
 import 'dart:convert';
@@ -6,8 +5,6 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 class GoogleDriveService {
-  // ⭐ Google Apps Script 웹앱 URL
-  // 설정 방법: script.google.com → 새 프로젝트 → 배포 → 웹앱 → URL 복사
   static const String _scriptUrl =
       'https://script.google.com/macros/s/AKfycbwnNKdfySRnyaL_RU1lulbdsAfVbwnDnKB8tkGHc88R7z-TZB6jY63cweRgFGL3JLyxNw/exec';
 

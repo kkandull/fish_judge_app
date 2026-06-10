@@ -1,8 +1,5 @@
-// lib/services/block_service.dart
-//
 // 본인이 차단한 사용자 UID 목록 관리.
 // SharedPreferences에 로컬 저장.
-//
 // 차단된 사용자의 게시글은 목록에서 안 보이게 필터링.
 
 import 'package:shared_preferences/shared_preferences.dart';

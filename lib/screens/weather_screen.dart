@@ -1,5 +1,4 @@
-// lib/screens/weather_screen.dart
-// ✅ 4번: 출처 표시(국립해양조사원·기상청) + 에러 UI 개선
+// 날씨 화면
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -106,7 +105,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
               ? _buildError()
               : Column(
                   children: [
-                    // ⭐ 오프라인 배너 상단 고정 (스크롤과 무관하게 항상 보임)
+                    // 오프라인 배너 상단 고정 
                     if (_isOffline) _buildOfflineBanner(),
                     Expanded(
                       child: RefreshIndicator(
@@ -342,7 +341,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
     ]);
   }
 
-  // ⭐ 4번: 국립해양조사원 출처 표시
   Widget _buildOceanGrid(WeatherData data) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
@@ -382,7 +380,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
     if (w < 1.5) return '주의'; return '위험';
   }
 
-  // ⭐ 4번: 기상청 출처 표시
   Widget _buildWeatherGrid(WeatherData data) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
@@ -510,7 +507,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
     );
   }
 
-  // ⭐ 9번(weather): 에러 UI 개선
   Widget _buildOfflineBanner() {
     return Material(
       color: const Color(0xFFF97316), // 주황

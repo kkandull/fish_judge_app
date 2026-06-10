@@ -1,5 +1,4 @@
-// lib/screens/settings_screen.dart
-// ✅ 설정 화면
+// 설정 화면
 // - 앱 버전 정보
 // - 개인정보처리방침 링크
 // - 오픈소스 라이선스
@@ -18,7 +17,6 @@ const Color _kSub    = Color(0xFF868E96);
 const Color _kBg     = Color(0xFFF5F7FA);
 const Color _kBorder = Color(0xFFE8EAED);
 
-// ⭐ 여기에 GitHub Pages URL 입력
 const String _kPrivacyPolicyUrl =
     'https://kkandull.github.io/nowfishing/privacy.html';
 
@@ -30,13 +28,12 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  String _appVersion = '1.0.0';
+  String _appVersion = '1.0.2';
 
   @override
   void initState() {
     super.initState();
-    // package_info_plus 없이 하드코딩 (pubspec.yaml version과 동기화)
-    _appVersion = '1.0.0';
+    _appVersion = '1.0.2';
   }
 
   Future<void> _openUrl(String url) async {
@@ -132,8 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
 
-          // ── 앱 정보 ──────────────────────────────────
-          _SectionHeader(title: '앱 정보'),
+          // 앱 정보
           _SettingCard(children: [
             _InfoTile(
               icon: Icons.water_rounded,
@@ -152,7 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 16),
 
-          // ── 피드백 ────────────────────────────────────
+          // 피드백
           _SectionHeader(title: '의견 보내기'),
           _SettingCard(children: [
             _ActionTile(
@@ -166,7 +162,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 16),
 
-          // ── 법적 고지 ─────────────────────────────────
+          // 법적 고지 
           _SectionHeader(title: '법적 고지'),
           _SettingCard(children: [
             _ActionTile(
@@ -197,7 +193,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 16),
 
-          // ── 데이터 관리 ───────────────────────────────
+          // 데이터 관리 
           _SectionHeader(title: '데이터 관리'),
           _SettingCard(children: [
             _ActionTile(
@@ -211,7 +207,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 16),
 
-          // ── 문의 ──────────────────────────────────────
+          // 문의 
           _SectionHeader(title: '문의'),
           _SettingCard(children: [
             _ActionTile(
@@ -240,9 +236,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 피드백 다이얼로그
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class _FeedbackDialog extends StatefulWidget {
   @override
@@ -420,9 +414,7 @@ class _FeedbackDialogState extends State<_FeedbackDialog> {
   }
 }
 
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // 공통 위젯
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 class _SectionHeader extends StatelessWidget {
   final String title;
