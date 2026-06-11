@@ -87,7 +87,7 @@
 
 **학습 환경**
 - 아키텍처: MobileNetV3-Large (ImageNet 사전학습 → Fine-tuning)
-- 학습 데이터: 총 1,926장 (train 1,926 / val 340 / test 220)
+- 학습 데이터: 총 1,926장
 - 증강 기법: RandAugment, MixUp(40%), CutMix(20%), Focal Loss, EMA, 화면/인쇄 강건 증강
 - 학습 환경: NVIDIA RTX 5070 Ti, CUDA 12.x, PyTorch 2.x
 
@@ -122,7 +122,7 @@ lib/
 ## 실행 방법
 
 **요구사항**
-- Flutter 3.x 이상
+- Flutter 3.41.8 이상
 - Android SDK (minSdk 26, targetSdk 34)
 - Firebase 프로젝트 설정 (`google-services.json`)
 
