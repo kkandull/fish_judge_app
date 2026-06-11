@@ -83,7 +83,7 @@
 | Top-3 정확도 | 100.00% |
 | Macro F1 | 95.02% |
 | 모델 크기 | 16.28 MB (FP32 TFLite) |
-| CPU 추론 속도 | 19.8ms |
+| 실기기 추론 속도 | 194.0ms(노트 20 울트라) |
 
 **학습 환경**
 - 아키텍처: MobileNetV3-Large (ImageNet 사전학습 → Fine-tuning)
